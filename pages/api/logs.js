@@ -112,8 +112,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: '필수 필드가 누락되었습니다.' });
       }
       
+      // 클라이언트가 제공한 타임스탬프 사용 또는 현재 시간 사용
+      const timestamp = req.body.timestamp ? new Date(req.body.timestamp) : new Date();
+      
       // 새 로그 항목 생성
-      const timestamp = new Date();
       const newLog = {
         nickname: req.body.nickname,
         timestamp: timestamp.toISOString(),
@@ -122,6 +124,13 @@ export default async function handler(req, res) {
         problemCount: req.body.problemCount || null,
         messageId: req.body.messageId || `manual-${Date.now()}`
       };
+      
+      // 로그에 기록
+      console.log('새 로그 항목 생성:', {
+        nickname: newLog.nickname,
+        timestamp: newLog.timestamp,
+        customTimestamp: !!req.body.timestamp
+      });
       
       // 기존 로그 데이터 가져오기
       const { logs, sha } = await getLogFileFromGitHub(octokit, owner, repo, logFilePath);
