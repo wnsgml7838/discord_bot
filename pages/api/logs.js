@@ -158,9 +158,28 @@ export default async function handler(req, res) {
       const { logs, sha } = await getLogFileFromGitHub(octokit, owner, repo, logFilePath);
       
       // 수정할 로그 항목 찾기 (timestamp를 ID로 사용)
-      const logIndex = logs.findIndex(log => log.timestamp === req.body.id);
+      console.log('로그 데이터 수정 요청 ID:', req.body.id);
+      
+      // 더 유연한 비교를 위해 타임스탬프 형식 처리
+      const logIndex = logs.findIndex(log => {
+        // 정확히 같은 경우
+        if (log.timestamp === req.body.id) return true;
+        
+        try {
+          // ISO 문자열의 날짜 부분까지만 비교 (밀리초 제외)
+          const reqDate = new Date(req.body.id).toISOString().split('.')[0];
+          const logDate = new Date(log.timestamp).toISOString().split('.')[0];
+          return reqDate === logDate;
+        } catch (e) {
+          console.error('타임스탬프 비교 오류:', e);
+          return false;
+        }
+      });
+      
+      console.log('찾은 로그 인덱스:', logIndex);
       
       if (logIndex === -1) {
+        console.log('로그 항목을 찾지 못함. 전체 로그 타임스탬프:', logs.map(log => log.timestamp));
         return res.status(404).json({ message: '해당 ID의 로그 항목을 찾을 수 없습니다.' });
       }
       
@@ -205,9 +224,28 @@ export default async function handler(req, res) {
       const { logs, sha } = await getLogFileFromGitHub(octokit, owner, repo, logFilePath);
       
       // 삭제할 로그 항목 찾기 (timestamp를 ID로 사용)
-      const logIndex = logs.findIndex(log => log.timestamp === req.body.id);
+      console.log('로그 데이터 삭제 요청 ID:', req.body.id);
+      
+      // 더 유연한 비교를 위해 타임스탬프 형식 처리
+      const logIndex = logs.findIndex(log => {
+        // 정확히 같은 경우
+        if (log.timestamp === req.body.id) return true;
+        
+        try {
+          // ISO 문자열의 날짜 부분까지만 비교 (밀리초 제외)
+          const reqDate = new Date(req.body.id).toISOString().split('.')[0];
+          const logDate = new Date(log.timestamp).toISOString().split('.')[0];
+          return reqDate === logDate;
+        } catch (e) {
+          console.error('타임스탬프 비교 오류:', e);
+          return false;
+        }
+      });
+      
+      console.log('찾은 로그 인덱스:', logIndex);
       
       if (logIndex === -1) {
+        console.log('로그 항목을 찾지 못함. 전체 로그 타임스탬프:', logs.map(log => log.timestamp));
         return res.status(404).json({ message: '해당 ID의 로그 항목을 찾을 수 없습니다.' });
       }
       
