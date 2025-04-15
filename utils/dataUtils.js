@@ -72,6 +72,36 @@ export function getSubmissionsByDate(logs) {
 }
 
 /**
+ * 한국 시간대(KST) 기준 날짜 객체 생성하기
+ * @param {string|Date} date - 날짜 문자열 또는 Date 객체
+ * @returns {Date} KST 기준 날짜 객체
+ */
+function toKSTDate(date) {
+  const utcDate = typeof date === 'string' ? new Date(date) : new Date(date);
+  // KST는 UTC+9
+  return new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+}
+
+/**
+ * 스터디 기준일 계산 (당일 오전 2시 ~ 다음날 오전 2시)
+ * @param {Date} date - KST 날짜 객체
+ * @returns {string} 스터디 기준일 (YYYY-MM-DD)
+ */
+function getStudyDate(date) {
+  const kstDate = toKSTDate(date);
+  const hours = kstDate.getHours();
+  
+  // 오전 2시 이전이면 전날을 기준일로 설정
+  if (hours < 2) {
+    const prevDay = new Date(kstDate);
+    prevDay.setDate(prevDay.getDate() - 1);
+    return format(prevDay, 'yyyy-MM-dd');
+  }
+  
+  return format(kstDate, 'yyyy-MM-dd');
+}
+
+/**
  * 사용자별 최장 연속 인증일수(스트릭) 계산
  */
 export function getUserStreaks(logs) {
@@ -88,15 +118,15 @@ export function getUserStreaks(logs) {
   
   // 각 사용자별로 스트릭 계산
   Object.entries(userLogs).forEach(([nickname, userLog]) => {
-    // 날짜를 YYYY-MM-DD 형식으로 변환하고 중복 제거 (하루에 여러 번 제출 가능)
-    const dates = [...new Set(userLog.map(log => log.timestamp.split('T')[0]))].sort();
+    // 스터디 기준일(당일 오전 2시 ~ 차일 오전 2시)로 변환하고 중복 제거
+    const studyDates = [...new Set(userLog.map(log => getStudyDate(log.timestamp)))].sort();
     
     let currentStreak = 1;
     let maxStreak = 1;
     
-    for (let i = 1; i < dates.length; i++) {
-      const prevDate = new Date(dates[i-1]);
-      const currDate = new Date(dates[i]);
+    for (let i = 1; i < studyDates.length; i++) {
+      const prevDate = new Date(studyDates[i-1]);
+      const currDate = new Date(studyDates[i]);
       
       // 현재 날짜가 이전 날짜의 다음 날인지 확인
       if (differenceInDays(currDate, prevDate) === 1) {
@@ -135,12 +165,14 @@ export function getMaxStreak(logs) {
  * 요일별 제출 횟수 계산
  */
 export function getSubmissionsByDayOfWeek(logs) {
+  // 한국어 요일 고정 (언어 설정과 무관하게 동작)
   const days = ['일', '월', '화', '수', '목', '금', '토'];
   const submissionsByDay = Array(7).fill(0);
   
   logs.forEach(log => {
-    const date = parseISO(log.timestamp);
-    const dayIndex = date.getDay(); // 0-6 (일-토)
+    // KST 기준으로 변환
+    const kstDate = toKSTDate(log.timestamp);
+    const dayIndex = kstDate.getDay(); // 0-6 (일-토)
     submissionsByDay[dayIndex]++;
   });
   
@@ -158,8 +190,9 @@ export function getSubmissionsByTimeOfDay(logs) {
   const submissionsByTime = Array(7).fill(0);
   
   logs.forEach(log => {
-    const date = parseISO(log.timestamp);
-    const hours = date.getHours();
+    // KST 기준으로 변환
+    const kstDate = toKSTDate(log.timestamp);
+    const hours = kstDate.getHours();
     
     let timeIndex;
     if (hours >= 6 && hours < 9) timeIndex = 0;
@@ -207,8 +240,9 @@ export function getRecentNonSubmitters(logs, days = 3) {
   // 최근 N일 동안 제출한 사용자 목록
   const recentSubmitters = new Set();
   logs.forEach(log => {
-    const logDate = parseISO(log.timestamp);
-    if (isAfter(logDate, dateThreshold)) {
+    // KST 기준으로 변환
+    const kstDate = toKSTDate(log.timestamp);
+    if (isAfter(kstDate, dateThreshold)) {
       recentSubmitters.add(log.nickname);
     }
   });
@@ -324,7 +358,7 @@ export function getDailyParticipationRate(logs, days = 14) {
   
   if (totalUsers === 0) return { labels: [], data: [], average: 0 };
   
-  // 날짜별 제출 기록 초기화
+  // 날짜별 제출 기록 초기화 (스터디 기준일 사용)
   const dailyParticipation = {};
   for (let i = 0; i < days; i++) {
     const date = subDays(today, i);
@@ -332,13 +366,13 @@ export function getDailyParticipationRate(logs, days = 14) {
     dailyParticipation[dateStr] = new Set();
   }
   
-  // 로그 데이터 분석하여 날짜별 제출자 집계
+  // 로그 데이터 분석하여 날짜별 제출자 집계 (스터디 기준일 사용)
   logs.forEach(log => {
-    const logDate = parseISO(log.timestamp);
-    const dateStr = format(logDate, 'yyyy-MM-dd');
+    // 스터디 기준일 적용 (당일 오전 2시 ~ 차일 오전 2시)
+    const studyDate = getStudyDate(log.timestamp);
     
-    if (dailyParticipation[dateStr]) {
-      dailyParticipation[dateStr].add(log.nickname);
+    if (dailyParticipation[studyDate]) {
+      dailyParticipation[studyDate].add(log.nickname);
     }
   });
   
