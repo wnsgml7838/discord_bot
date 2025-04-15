@@ -20,7 +20,7 @@ ChartJS.register(
   Legend
 );
 
-const HeatmapChart = ({ title, data, labels, colorGradient = 'blue' }) => {
+const BarChart = ({ title, data, labels, colorGradient = 'blue' }) => {
   // 색상 그라데이션 설정
   const getColorGradient = (value, max) => {
     const ratio = value / (max || 1);
@@ -31,9 +31,13 @@ const HeatmapChart = ({ title, data, labels, colorGradient = 'blue' }) => {
       return `rgba(16, 185, 129, ${0.3 + ratio * 0.7})`;
     } else if (colorGradient === 'purple') {
       return `rgba(139, 92, 246, ${0.3 + ratio * 0.7})`;
+    } else if (colorGradient === 'orange') {
+      return `rgba(249, 115, 22, ${0.3 + ratio * 0.7})`;
+    } else if (colorGradient === 'red') {
+      return `rgba(239, 68, 68, ${0.3 + ratio * 0.7})`;
     } else {
-      // 기본 그린 그라데이션
-      return `rgba(16, 185, 129, ${0.3 + ratio * 0.7})`;
+      // 기본 블루 그라데이션
+      return `rgba(59, 130, 246, ${0.3 + ratio * 0.7})`;
     }
   };
   
@@ -50,8 +54,9 @@ const HeatmapChart = ({ title, data, labels, colorGradient = 'blue' }) => {
         backgroundColor: data.map(value => getColorGradient(value, maxValue)),
         borderColor: 'rgba(30, 41, 59, 0.8)',
         borderWidth: 1,
-        borderRadius: 4,
+        borderRadius: 8,
         borderSkipped: false,
+        maxBarThickness: 40,
       }
     ]
   };
@@ -87,7 +92,7 @@ const HeatmapChart = ({ title, data, labels, colorGradient = 'blue' }) => {
         usePointStyle: true,
         callbacks: {
           label: function(context) {
-            return `${context.formattedValue}회 제출`;
+            return `${context.formattedValue}`;
           }
         }
       }
@@ -117,8 +122,8 @@ const HeatmapChart = ({ title, data, labels, colorGradient = 'blue' }) => {
   };
   
   return (
-    <div className="card h-[280px]">
-      <h3 className="text-base font-medium text-gray-300 mb-2">{title}</h3>
+    <div className="card bg-slate-800 rounded-xl p-4 shadow-lg h-[280px]">
+      <h3 className="text-base font-medium text-gray-100 mb-2">{title}</h3>
       <div className="h-[230px]">
         <Bar data={chartData} options={options} />
       </div>
@@ -126,4 +131,4 @@ const HeatmapChart = ({ title, data, labels, colorGradient = 'blue' }) => {
   );
 };
 
-export default HeatmapChart; 
+export default BarChart; 
