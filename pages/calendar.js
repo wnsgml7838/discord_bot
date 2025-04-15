@@ -151,8 +151,10 @@ export default function CalendarPage() {
   
   // 로그 수정 시작
   const startEditing = (log) => {
+    console.log('수정할 로그:', log);
     setEditingLog({
       ...log,
+      originalTimestamp: log.timestamp, // 원본 타임스탬프 저장
       timestamp: new Date(log.timestamp).toISOString().slice(0, 16)
     });
     setIsEditing(true);
@@ -167,13 +169,22 @@ export default function CalendarPage() {
     try {
       setIsSubmitting(true);
       
+      // 디버깅을 위한 로그
+      console.log('수정 제출 데이터:', {
+        id: editingLog.originalTimestamp || editingLog.timestamp,
+        nickname: editingLog.nickname,
+        image_url: editingLog.image_url,
+        problemCount: editingLog.problemCount,
+        newTimestamp: new Date(editingLog.timestamp).toISOString()
+      });
+      
       const response = await fetch('/api/logs', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: editingLog.timestamp,
+          id: editingLog.originalTimestamp || editingLog.timestamp, // 원본 타임스탬프 사용
           nickname: editingLog.nickname,
           image_url: editingLog.image_url,
           problemCount: editingLog.problemCount ? parseInt(editingLog.problemCount) : null,
@@ -224,6 +235,8 @@ export default function CalendarPage() {
     
     try {
       setIsSubmitting(true);
+      
+      console.log('삭제할 로그:', log);
       
       const response = await fetch('/api/logs', {
         method: 'DELETE',
