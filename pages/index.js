@@ -5,6 +5,7 @@ import {
   startOfWeek, endOfWeek, eachDayOfInterval, isSameDay
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import Link from 'next/link';
 
 // 데이터 처리 유틸리티 함수 임포트
 import {
@@ -161,6 +162,16 @@ export default function Home() {
         <p className="text-center text-gray-600">스터디 참여 현황 및 데이터 분석</p>
       </header>
 
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">대시보드</h1>
+        <Link href="/calendar" className="inline-flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span>캘린더 보기</span>
+        </Link>
+      </div>
+
       <main>
         {loading ? (
           <div className="text-center py-10">로딩 중...</div>
@@ -273,54 +284,6 @@ export default function Home() {
                   onImageClick={openImagePreview}
                 />
               </div>
-            </section>
-            
-            {/* 모든 인증 내역 테이블 */}
-            <section>
-              <h2 className="text-xl font-semibold mb-4">전체 인증 내역</h2>
-              <div className="overflow-x-auto rounded-lg shadow">
-                <table className="min-w-full bg-white">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-6 py-3 border-b border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        닉네임
-                      </th>
-                      <th className="px-6 py-3 border-b border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        인증 일시
-                      </th>
-                      <th className="px-6 py-3 border-b border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        인증 이미지
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {logs.map((log, index) => (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{log.nickname}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">{log.timestampStr || log.timestamp}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <button 
-                            onClick={() => openImagePreview(log.image_url)} 
-                            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
-                          >
-                            이미지 보기
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              
-              {logs.length === 0 && (
-                <div className="text-center py-10 text-gray-500">
-                  아직 저장된 인증 기록이 없습니다.
-                </div>
-              )}
             </section>
           </>
         )}
