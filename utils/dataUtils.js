@@ -77,9 +77,28 @@ export function getSubmissionsByDate(logs) {
  * @returns {Date} KST 기준 날짜 객체
  */
 function toKSTDate(date) {
-  const utcDate = typeof date === 'string' ? new Date(date) : new Date(date);
-  // KST는 UTC+9
-  return new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+  // 이미 Date 객체인 경우
+  if (date instanceof Date) {
+    // 봇에서 생성된 Date 객체는 로컬 시간이므로 그대로 반환
+    return new Date(date);
+  }
+  
+  // 문자열인 경우
+  if (typeof date === 'string') {
+    // ISO 형식의 타임스탬프인지 확인
+    // Z로 끝나는 경우(UTC 시간) 또는 +00:00과 같은 타임존 정보가 있는 경우
+    if (date.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(date)) {
+      // 타임존 정보가 있는 경우 UTC에서 KST로 변환 (+9시간)
+      const utcDate = new Date(date);
+      return new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+    } else {
+      // 타임존 정보가 없는 경우, 이미 로컬 시간(KST)으로 간주하고 그대로 반환
+      return new Date(date);
+    }
+  }
+  
+  // 그 외 케이스는 기본 Date 객체 반환
+  return new Date(date);
 }
 
 /**
