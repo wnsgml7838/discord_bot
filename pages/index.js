@@ -1,11 +1,45 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { 
+  subDays, parseISO, format, isWithinInterval, startOfDay, endOfDay,
+  startOfWeek, endOfWeek, eachDayOfInterval, isSameDay
+} from 'date-fns';
+import { ko } from 'date-fns/locale';
+
+// 데이터 처리 유틸리티 함수 임포트
+import {
+  getTotalSubmissions, getAverageSubmissionsPerUser, getMaxStreak,
+  getTopSubmitter, getSubmissionsByDayOfWeek, getSubmissionsByTimeOfDay,
+  getTop5Users, getRecentNonSubmitters, getRecentSubmissions,
+  getTrendingUsers, getInactiveUsers, getTopStreakUsers
+} from '../utils/dataUtils';
+
+// 컴포넌트 임포트
+import StatCard from '../components/StatCard';
+import HeatmapChart from '../components/HeatmapChart';
+import LineChart from '../components/LineChart';
+import AlertCard from '../components/AlertCard';
+import ThumbnailGallery from '../components/ThumbnailGallery';
 
 export default function Home() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [statsData, setStatsData] = useState({
+    totalSubmissions: 0,
+    averagePerUser: 0,
+    maxStreak: { streak: 0, nickname: '' },
+    topSubmitter: { nickname: '', count: 0 },
+    dayOfWeekData: { labels: [], data: [] },
+    timeOfDayData: { labels: [], data: [] },
+    top5Users: [],
+    nonSubmitters: [],
+    recentSubmissions: [],
+    trendingUsers: [],
+    inactiveUsers: [],
+    topStreakUsers: []
+  });
 
   useEffect(() => {
     // 로그 데이터 가져오기
@@ -21,6 +55,11 @@ export default function Home() {
       .then(data => {
         setLogs(Array.isArray(data) ? data : []);
         setLoading(false);
+        
+        // 로그 데이터가 있으면 통계 계산
+        if (data.length > 0) {
+          calculateStats(data);
+        }
       })
       .catch(error => {
         console.error('Error fetching logs:', error);
@@ -28,6 +67,76 @@ export default function Home() {
         setLoading(false);
       });
   }, []);
+  
+  // 통계 데이터 계산
+  const calculateStats = (logs) => {
+    // 상단 영역 통계
+    const totalSubmissions = getTotalSubmissions(logs);
+    const averagePerUser = getAverageSubmissionsPerUser(logs);
+    const maxStreak = getMaxStreak(logs);
+    const topSubmitter = getTopSubmitter(logs);
+    
+    // 중간 영역 차트 데이터
+    const dayOfWeekData = getSubmissionsByDayOfWeek(logs);
+    const timeOfDayData = getSubmissionsByTimeOfDay(logs);
+    
+    // Top 5 랭커
+    const top5Users = getTop5Users(logs);
+    
+    // 기간별 추이 데이터 (Top 5 사용자)
+    const top5LineChartData = prepareLineChartData(logs, top5Users);
+    
+    // 하단 영역 알림 데이터
+    const nonSubmitters = getRecentNonSubmitters(logs, 3);
+    const recentSubmissions = getRecentSubmissions(logs, 6);
+    const trendingUsers = getTrendingUsers(logs);
+    const inactiveUsers = getInactiveUsers(logs, 3);
+    const topStreakUsers = getTopStreakUsers(logs);
+    
+    setStatsData({
+      totalSubmissions,
+      averagePerUser,
+      maxStreak,
+      topSubmitter,
+      dayOfWeekData,
+      timeOfDayData,
+      top5Users,
+      top5LineChartData,
+      nonSubmitters,
+      recentSubmissions,
+      trendingUsers,
+      inactiveUsers,
+      topStreakUsers
+    });
+  };
+  
+  // Top 5 사용자의 제출 추이 데이터 준비
+  const prepareLineChartData = (logs, top5Users) => {
+    // 최근 14일 날짜 범위 생성
+    const today = new Date();
+    const twoWeeksAgo = subDays(today, 13);
+    const dateRange = eachDayOfInterval({ start: twoWeeksAgo, end: today });
+    const labels = dateRange.map(date => format(date, 'MM.dd', { locale: ko }));
+    
+    // 상위 5명 사용자별 일자별 제출 횟수 계산
+    const datasets = top5Users.map(user => {
+      const userLogs = logs.filter(log => log.nickname === user.nickname);
+      
+      const data = dateRange.map(date => {
+        return userLogs.filter(log => {
+          const logDate = parseISO(log.timestamp);
+          return isSameDay(logDate, date);
+        }).length;
+      });
+      
+      return {
+        label: user.nickname,
+        data
+      };
+    });
+    
+    return { labels, datasets };
+  };
 
   // 이미지 미리보기 모달 표시
   const openImagePreview = (imageUrl) => {
@@ -40,16 +149,19 @@ export default function Home() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-6">
       <Head>
         <title>코딩테스트 인증 대시보드</title>
         <meta name="description" content="코딩테스트 인증 스터디 대시보드" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
+      <header className="mb-6">
+        <h1 className="text-3xl font-bold text-center mb-2">코딩테스트 인증 대시보드</h1>
+        <p className="text-center text-gray-600">스터디 참여 현황 및 데이터 분석</p>
+      </header>
+
       <main>
-        <h1 className="text-3xl font-bold mb-6 text-center">코딩테스트 인증 대시보드</h1>
-        
         {loading ? (
           <div className="text-center py-10">로딩 중...</div>
         ) : error ? (
@@ -57,55 +169,160 @@ export default function Home() {
             {error}
           </div>
         ) : (
-          <div>
-            <div className="mb-4">
-              <p className="font-semibold">총 인증 횟수: {logs.length}회</p>
-            </div>
-            
-            <div className="overflow-x-auto rounded-lg shadow">
-              <table className="min-w-full bg-white">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-6 py-3 border-b border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      닉네임
-                    </th>
-                    <th className="px-6 py-3 border-b border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      인증 일시
-                    </th>
-                    <th className="px-6 py-3 border-b border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      인증 이미지
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {logs.map((log, index) => (
-                    <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{log.nickname}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{log.timestampStr || log.timestamp}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <button 
-                          onClick={() => openImagePreview(log.image_url)} 
-                          className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
-                        >
-                          이미지 보기
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            {logs.length === 0 && (
-              <div className="text-center py-10 text-gray-500">
-                아직 저장된 인증 기록이 없습니다.
+          <>
+            {/* 🔼 상단 영역: 주요 통계 */}
+            <section className="mb-8">
+              <h2 className="text-xl font-semibold mb-4">스터디 현황 요약</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard 
+                  title="누적 제출 횟수" 
+                  value={statsData.totalSubmissions} 
+                  caption="전체 스터디원들의 인증 횟수"
+                  color="blue"
+                />
+                <StatCard 
+                  title="평균 제출 횟수" 
+                  value={statsData.averagePerUser} 
+                  caption="스터디원 1인당 인증 횟수"
+                  color="green"
+                />
+                <StatCard 
+                  title="최장 연속 인증일" 
+                  value={statsData.maxStreak.streak} 
+                  caption={`최고 기록: ${statsData.maxStreak.nickname || '-'}`}
+                  color="amber"
+                />
+                <StatCard 
+                  title="최다 제출자" 
+                  value={statsData.topSubmitter.nickname || '-'} 
+                  caption={`${statsData.topSubmitter.count || 0}회 제출`}
+                  color="purple"
+                />
               </div>
-            )}
-          </div>
+            </section>
+            
+            {/* 🔽 중간 영역: 데이터 시각화 */}
+            <section className="mb-8">
+              <h2 className="text-xl font-semibold mb-4">제출 패턴 분석</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <HeatmapChart 
+                  title="요일별 제출 현황" 
+                  data={statsData.dayOfWeekData.data} 
+                  labels={statsData.dayOfWeekData.labels}
+                  colorGradient="blue"
+                />
+                <HeatmapChart 
+                  title="시간대별 제출 현황" 
+                  data={statsData.timeOfDayData.data} 
+                  labels={statsData.timeOfDayData.labels}
+                  colorGradient="green"
+                />
+              </div>
+              
+              {statsData.top5LineChartData && (
+                <div className="mt-6">
+                  <LineChart 
+                    title="Top 5 랭커의 제출 추이 (최근 14일)" 
+                    datasets={statsData.top5LineChartData.datasets} 
+                    labels={statsData.top5LineChartData.labels}
+                  />
+                </div>
+              )}
+            </section>
+            
+            {/* 📉 하단 영역: 알림 및 갤러리 */}
+            <section className="mb-8">
+              <h2 className="text-xl font-semibold mb-4">현황 및 알림</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <AlertCard 
+                  title="최근 3일간 미제출자" 
+                  items={statsData.nonSubmitters.map(nickname => nickname)}
+                  type="warning"
+                />
+                <AlertCard 
+                  title="트렌드 알림" 
+                  items={[
+                    ...(statsData.trendingUsers.map(user => ({
+                      text: `${user.nickname}: 증가 중`,
+                      caption: `(+${user.increase}회)`
+                    }))),
+                    ...(statsData.inactiveUsers.slice(0, 3).map(user => ({
+                      text: `${user.nickname}: 쉬는 중`,
+                      caption: `(${user.daysSinceLastSubmission}일 째)`
+                    }))),
+                    ...(statsData.topStreakUsers.map(user => ({
+                      text: `${user.nickname}: 연속 인증`,
+                      caption: `(${user.streak}일)`
+                    })))
+                  ]}
+                  type="info"
+                />
+                <AlertCard 
+                  title="랭킹 TOP 5" 
+                  items={statsData.top5Users.map(user => ({
+                    text: user.nickname,
+                    caption: `(${user.count}회 제출)`
+                  }))}
+                  type="success"
+                />
+              </div>
+              
+              <div className="mt-6">
+                <ThumbnailGallery 
+                  submissions={statsData.recentSubmissions}
+                  onImageClick={openImagePreview}
+                />
+              </div>
+            </section>
+            
+            {/* 모든 인증 내역 테이블 */}
+            <section>
+              <h2 className="text-xl font-semibold mb-4">전체 인증 내역</h2>
+              <div className="overflow-x-auto rounded-lg shadow">
+                <table className="min-w-full bg-white">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-6 py-3 border-b border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        닉네임
+                      </th>
+                      <th className="px-6 py-3 border-b border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        인증 일시
+                      </th>
+                      <th className="px-6 py-3 border-b border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        인증 이미지
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {logs.map((log, index) => (
+                      <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{log.nickname}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-500">{log.timestampStr || log.timestamp}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button 
+                            onClick={() => openImagePreview(log.image_url)} 
+                            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                          >
+                            이미지 보기
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {logs.length === 0 && (
+                <div className="text-center py-10 text-gray-500">
+                  아직 저장된 인증 기록이 없습니다.
+                </div>
+              )}
+            </section>
+          </>
         )}
       </main>
 
