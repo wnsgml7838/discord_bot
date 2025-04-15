@@ -24,7 +24,15 @@ ChartJS.register(
   Filler
 );
 
-const LineChart = ({ title, datasets, labels }) => {
+const LineChart = ({ 
+  title, 
+  datasets, 
+  labels, 
+  yAxisLabel, 
+  suggestedMax, 
+  tooltipLabel,
+  tooltipSuffix
+}) => {
   // 차트 색상 (최대 5개 사용자 고려)
   const colorPalette = [
     { main: 'rgba(59, 130, 246, 1)', background: 'rgba(59, 130, 246, 0.2)' }, // 파랑
@@ -43,12 +51,12 @@ const LineChart = ({ title, datasets, labels }) => {
         label: dataset.label,
         data: dataset.data,
         fill: true,
-        backgroundColor: colorSet.background,
-        borderColor: colorSet.main,
+        backgroundColor: dataset.backgroundColor || colorSet.background,
+        borderColor: dataset.borderColor || colorSet.main,
         tension: 0.3,
         pointRadius: 3,
         pointHoverRadius: 6,
-        pointBackgroundColor: colorSet.main,
+        pointBackgroundColor: dataset.borderColor || colorSet.main,
         pointBorderColor: 'rgba(30, 41, 59, 1)',
         pointBorderWidth: 1.5,
       };
@@ -97,6 +105,10 @@ const LineChart = ({ title, datasets, labels }) => {
         usePointStyle: true,
         callbacks: {
           label: function(context) {
+            if (tooltipLabel) {
+              const suffix = tooltipSuffix || '';
+              return `${tooltipLabel}: ${context.formattedValue}${suffix}`;
+            }
             return `${context.dataset.label}: ${context.formattedValue}회 제출`;
           }
         }
@@ -114,13 +126,17 @@ const LineChart = ({ title, datasets, labels }) => {
       },
       y: {
         beginAtZero: true,
+        suggestedMax: suggestedMax,
         grid: {
           color: 'rgba(148, 163, 184, 0.1)',
           drawBorder: false,
         },
         ticks: {
           color: 'rgba(203, 213, 225, 0.8)',
-          precision: 0
+          precision: 0,
+          callback: function(value) {
+            return yAxisLabel ? `${value}${yAxisLabel}` : value;
+          }
         }
       }
     }

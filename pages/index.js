@@ -12,7 +12,8 @@ import {
   getTotalSubmissions, getAverageSubmissionsPerUser, getMaxStreak,
   getTopSubmitter, getSubmissionsByDayOfWeek, getSubmissionsByTimeOfDay,
   getTop5Users, getRecentNonSubmitters, getRecentSubmissions,
-  getTrendingUsers, getInactiveUsers, getTopStreakUsers
+  getTrendingUsers, getInactiveUsers, getTopStreakUsers,
+  getDailyParticipationRate
 } from '../utils/dataUtils';
 
 // 컴포넌트 임포트
@@ -34,6 +35,7 @@ export default function Home() {
     topSubmitter: { nickname: '', count: 0 },
     dayOfWeekData: { labels: [], data: [] },
     timeOfDayData: { labels: [], data: [] },
+    participationRateData: { labels: [], data: [], average: 0 },
     top5Users: [],
     nonSubmitters: [],
     recentSubmissions: [],
@@ -81,6 +83,9 @@ export default function Home() {
     const dayOfWeekData = getSubmissionsByDayOfWeek(logs);
     const timeOfDayData = getSubmissionsByTimeOfDay(logs);
     
+    // 일일 참여율 데이터 추가
+    const participationRateData = getDailyParticipationRate(logs, 14);
+    
     // Top 5 랭커
     const top5Users = getTop5Users(logs);
     
@@ -101,6 +106,7 @@ export default function Home() {
       topSubmitter,
       dayOfWeekData,
       timeOfDayData,
+      participationRateData,
       top5Users,
       top5LineChartData,
       nonSubmitters,
@@ -152,13 +158,13 @@ export default function Home() {
   return (
     <div className="container mx-auto px-4 py-6">
       <Head>
-        <title>코딩테스트 인증 대시보드</title>
+        <title>YEARDREAM 5th ALGORITHM</title>
         <meta name="description" content="코딩테스트 인증 스터디 대시보드" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <header className="mb-6">
-        <h1 className="text-3xl font-bold text-center mb-2">코딩테스트 인증 대시보드</h1>
+        <h1 className="text-3xl font-bold text-center mb-2">YEARDREAM 5th ALGORITHM </h1>
         <p className="text-center text-gray-600">스터디 참여 현황 및 데이터 분석</p>
       </header>
 
@@ -184,7 +190,7 @@ export default function Home() {
             {/* 🔼 상단 영역: 주요 통계 */}
             <section className="mb-8">
               <h2 className="text-xl font-semibold mb-4">스터디 현황 요약</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <StatCard 
                   title="누적 제출 횟수" 
                   value={statsData.totalSubmissions} 
@@ -209,12 +215,37 @@ export default function Home() {
                   caption={`${statsData.topSubmitter.count || 0}회 제출`}
                   color="purple"
                 />
+                <StatCard 
+                  title="평균 참여율" 
+                  value={`${statsData.participationRateData?.average || 0}%`} 
+                  caption="최근 14일 기준"
+                  color="indigo"
+                />
               </div>
             </section>
             
             {/* 🔽 중간 영역: 데이터 시각화 */}
             <section className="mb-8">
               <h2 className="text-xl font-semibold mb-4">제출 패턴 분석</h2>
+              
+              {/* 일일 참여율 차트 추가 */}
+              <div className="mb-6">
+                <LineChart 
+                  title={`일일 참여율 (최근 14일) - 평균: ${statsData.participationRateData?.average || 0}%`}
+                  datasets={[{
+                    label: '참여율(%)',
+                    data: statsData.participationRateData?.data || [],
+                    borderColor: 'rgba(79, 70, 229, 1)',
+                    backgroundColor: 'rgba(79, 70, 229, 0.1)'
+                  }]}
+                  labels={statsData.participationRateData?.labels || []}
+                  yAxisLabel="%"
+                  suggestedMax={100}
+                  tooltipLabel="참여율"
+                  tooltipSuffix="%"
+                />
+              </div>
+              
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <HeatmapChart 
                   title="요일별 제출 현황" 

@@ -309,4 +309,62 @@ export function getTopStreakUsers(logs) {
     .map(([nickname, streak]) => ({ nickname, streak }))
     .sort((a, b) => b.streak - a.streak)
     .slice(0, 3);
+}
+
+/**
+ * 일일 참여율 계산
+ */
+export function getDailyParticipationRate(logs, days = 14) {
+  const today = new Date();
+  const startDate = subDays(today, days - 1);
+  
+  // 모든 사용자 목록
+  const allUsers = new Set(logs.map(log => log.nickname));
+  const totalUsers = allUsers.size;
+  
+  if (totalUsers === 0) return { labels: [], data: [], average: 0 };
+  
+  // 날짜별 제출 기록 초기화
+  const dailyParticipation = {};
+  for (let i = 0; i < days; i++) {
+    const date = subDays(today, i);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    dailyParticipation[dateStr] = new Set();
+  }
+  
+  // 로그 데이터 분석하여 날짜별 제출자 집계
+  logs.forEach(log => {
+    const logDate = parseISO(log.timestamp);
+    const dateStr = format(logDate, 'yyyy-MM-dd');
+    
+    if (dailyParticipation[dateStr]) {
+      dailyParticipation[dateStr].add(log.nickname);
+    }
+  });
+  
+  // 날짜 역순으로 정렬 (최신 날짜가 마지막)
+  const sortedDates = Object.keys(dailyParticipation).sort();
+  
+  // 날짜별 참여율 계산 
+  const participationData = sortedDates.map(date => {
+    const participants = dailyParticipation[date].size;
+    const rate = totalUsers > 0 ? (participants / totalUsers * 100).toFixed(1) : 0;
+    return parseFloat(rate);
+  });
+  
+  // 날짜 라벨 포맷팅 (MM.DD)
+  const dateLabels = sortedDates.map(date => 
+    format(parseISO(date), 'MM.dd', { locale: ko })
+  );
+  
+  // 평균 참여율 계산
+  const average = participationData.length > 0 
+    ? (participationData.reduce((acc, val) => acc + val, 0) / participationData.length).toFixed(1) 
+    : 0;
+  
+  return {
+    labels: dateLabels,
+    data: participationData,
+    average: parseFloat(average)
+  };
 } 
