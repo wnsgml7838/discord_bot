@@ -83,9 +83,14 @@ export default function CalendarPage() {
     const date = info.dateStr;
     const filteredLogs = logs.filter(log => log.date === date);
     
-    setSelectedDate(date);
-    setSelectedDateLogs(filteredLogs);
-    setShowSidePanel(true);
+    // 이미 선택된 날짜를 다시 클릭하면 사이드 패널 닫기
+    if (selectedDate === date && showSidePanel) {
+      setShowSidePanel(false);
+    } else {
+      setSelectedDate(date);
+      setSelectedDateLogs(filteredLogs);
+      setShowSidePanel(true);
+    }
   };
 
   // 이벤트 클릭 핸들러 (건수 클릭)
@@ -93,9 +98,14 @@ export default function CalendarPage() {
     const date = info.event.startStr;
     const filteredLogs = logs.filter(log => log.date === date);
     
-    setSelectedDate(date);
-    setSelectedDateLogs(filteredLogs);
-    setShowSidePanel(true);
+    // 이미 선택된 날짜를 다시 클릭하면 사이드 패널 닫기
+    if (selectedDate === date && showSidePanel) {
+      setShowSidePanel(false);
+    } else {
+      setSelectedDate(date);
+      setSelectedDateLogs(filteredLogs);
+      setShowSidePanel(true);
+    }
   };
 
   // 이미지 미리보기 모달 표시
@@ -120,8 +130,16 @@ export default function CalendarPage() {
         {/* 왼쪽 캘린더 영역 */}
         <div className={`${showSidePanel ? 'lg:w-2/3' : 'w-full'} bg-dark-800 rounded-lg shadow-lg p-5`}>
           {loading ? (
-            <div className="flex justify-center items-center h-96">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+            <div className="flex flex-col justify-center items-center h-96">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mb-4"></div>
+              <p className="text-gray-400">데이터를 불러오는 중입니다...</p>
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="flex flex-col justify-center items-center h-96">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+              </svg>
+              <p className="text-gray-400">인증 기록이 없습니다.</p>
             </div>
           ) : (
             <div className="calendar-container">
