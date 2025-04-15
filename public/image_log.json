@@ -279,5 +279,13 @@
     "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361558810975535154/2025-04-09_6.11.57.png?ex=67ff31f5&is=67fde075&hm=6a38286b21e2c4976a5cfe235d1a1c232498e875c19d42509c4dbc9a7267e8e7&",
     "messageId": "1361558811306889417",
     "isBaekjoonCalendar": false
+  },
+  {
+    "nickname": "joon_hee",
+    "timestamp": "2025-04-15T04:36:40.386Z",
+    "timestampStr": "2025-04-15 04:36:40",
+    "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361560837285740675/2025-04-13_6.38.01.png?ex=67ff33d8&is=67fde258&hm=4609990d2c7854ee3ac093f26d29f05effe9bbcc54c3cd7e5475f781ce6766a0&",
+    "messageId": "1361560837575151747",
+    "error": "analyzeBaekjoonCalendar is not a function"
   }
 ]
