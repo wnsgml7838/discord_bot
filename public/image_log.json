@@ -1,5 +1,44 @@
 [
   {
+    "nickname": "구성원 1",
+    "timestamp": "2025-04-15T04:52:40.559Z",
+    "timestampStr": "2025-04-15 04:52:40",
+    "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361357475336552568/2025-04-13_6.38.01.png?ex=67fe7672&is=67fd24f2&hm=6383e2678f1e6b3d5d0600a2b741fc612d7f1a8d3034914c94362a13982a7c5f&",
+    "problemCount": null,
+    "messageId": "manual-1744692760559"
+  },
+  {
+    "nickname": "joon_hee",
+    "timestamp": "2025-04-15T04:36:51.432Z",
+    "timestampStr": "2025-04-15 04:36:51",
+    "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361560883620348055/og_image.png?ex=67ff33e3&is=67fde263&hm=00ec17310373cf00b848087c33a326b798c76d84b7acf7120660fe3708423acd&",
+    "messageId": "1361560883993514044",
+    "error": "analyzeBaekjoonCalendar is not a function"
+  },
+  {
+    "nickname": "joon_hee",
+    "timestamp": "2025-04-15T04:36:40.386Z",
+    "timestampStr": "2025-04-15 04:36:40",
+    "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361560837285740675/2025-04-13_6.38.01.png?ex=67ff33d8&is=67fde258&hm=4609990d2c7854ee3ac093f26d29f05effe9bbcc54c3cd7e5475f781ce6766a0&",
+    "messageId": "1361560837575151747",
+    "error": "analyzeBaekjoonCalendar is not a function"
+  },
+  {
+    "nickname": "joon_hee",
+    "timestamp": "2025-04-15T04:28:37.323Z",
+    "timestampStr": "2025-04-15 04:28:37",
+    "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361558810975535154/2025-04-09_6.11.57.png?ex=67ff31f5&is=67fde075&hm=6a38286b21e2c4976a5cfe235d1a1c232498e875c19d42509c4dbc9a7267e8e7&",
+    "messageId": "1361558811306889417",
+    "isBaekjoonCalendar": false
+  },
+  {
+    "nickname": "joon_hee",
+    "timestamp": "2025-04-15T04:16:35.497Z",
+    "timestampStr": "2025-04-15 04:16:35",
+    "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361555783795478661/2025-04-10_9.56.16.png?ex=67ff2f23&is=67fddda3&hm=8397abf8a7bec919a69f884bb20f144168b8149a764d5ea8a08f0bd959c54597&",
+    "messageId": "1361555783942410332"
+  },
+  {
     "nickname": "gimchanggeon",
     "timestamp": "2025-04-15T01:21:11.158Z",
     "timestampStr": "2025-04-15 01:21:11",
@@ -264,36 +303,5 @@
     "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361357475336552568/2025-04-13_6.38.01.png?ex=67fe7672&is=67fd24f2&hm=6383e2678f1e6b3d5d0600a2b741fc612d7f1a8d3034914c94362a13982a7c5f&",
     "messageId": "1361357475571568831",
     "problemCount": null
-  },
-  {
-    "nickname": "joon_hee",
-    "timestamp": "2025-04-15T04:16:35.497Z",
-    "timestampStr": "2025-04-15 04:16:35",
-    "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361555783795478661/2025-04-10_9.56.16.png?ex=67ff2f23&is=67fddda3&hm=8397abf8a7bec919a69f884bb20f144168b8149a764d5ea8a08f0bd959c54597&",
-    "messageId": "1361555783942410332"
-  },
-  {
-    "nickname": "joon_hee",
-    "timestamp": "2025-04-15T04:28:37.323Z",
-    "timestampStr": "2025-04-15 04:28:37",
-    "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361558810975535154/2025-04-09_6.11.57.png?ex=67ff31f5&is=67fde075&hm=6a38286b21e2c4976a5cfe235d1a1c232498e875c19d42509c4dbc9a7267e8e7&",
-    "messageId": "1361558811306889417",
-    "isBaekjoonCalendar": false
-  },
-  {
-    "nickname": "joon_hee",
-    "timestamp": "2025-04-15T04:36:40.386Z",
-    "timestampStr": "2025-04-15 04:36:40",
-    "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361560837285740675/2025-04-13_6.38.01.png?ex=67ff33d8&is=67fde258&hm=4609990d2c7854ee3ac093f26d29f05effe9bbcc54c3cd7e5475f781ce6766a0&",
-    "messageId": "1361560837575151747",
-    "error": "analyzeBaekjoonCalendar is not a function"
-  },
-  {
-    "nickname": "joon_hee",
-    "timestamp": "2025-04-15T04:36:51.432Z",
-    "timestampStr": "2025-04-15 04:36:51",
-    "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361560883620348055/og_image.png?ex=67ff33e3&is=67fde263&hm=00ec17310373cf00b848087c33a326b798c76d84b7acf7120660fe3708423acd&",
-    "messageId": "1361560883993514044",
-    "error": "analyzeBaekjoonCalendar is not a function"
   }
 ]
