@@ -93,12 +93,19 @@ async function updateLogFileOnGitHub() {
 }
 
 // 이전 메시지 데이터 가져오기
-async function fetchHistoricalData(targetChannelId) {
+async function fetchHistoricalData(targetChannelId, resetData = false) {
   console.log('이전 메시지 데이터 수집을 시작합니다...');
   try {
     // 로그 데이터가 아직 로드되지 않았다면 로드
     if (logData.length === 0 && !fileSha) {
       await getLogFileFromGitHub();
+    }
+    
+    // 기존 데이터 초기화 옵션이 켜져 있으면 로그 데이터 비우기
+    if (resetData) {
+      console.log('기존 로그 데이터를 초기화합니다.');
+      logData = [];
+      // fileSha는 유지 (파일이 있는 경우 덮어쓰기 위해)
     }
     
     // 대상 채널 가져오기
@@ -266,7 +273,7 @@ async function startBot() {
 }
 
 // 이전 데이터 수집 명령어를 포함한 bot-start.js 파일 생성
-async function startBotWithHistoricalData(channelId) {
+async function startBotWithHistoricalData(channelId, resetData = false) {
   try {
     await startBot();
     
@@ -274,7 +281,7 @@ async function startBotWithHistoricalData(channelId) {
     client.once('ready', async () => {
       if (channelId) {
         console.log(`채널 ID ${channelId}에서 이전 데이터 수집을 시작합니다...`);
-        await fetchHistoricalData(channelId);
+        await fetchHistoricalData(channelId, resetData);
       } else {
         console.log('이전 데이터 수집을 건너뜁니다. 채널 ID가 지정되지 않았습니다.');
       }
