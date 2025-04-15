@@ -7,6 +7,11 @@ const isHistoricalMode = args.includes('--historical') || args.includes('-h');
 const resetData = args.includes('--reset') || args.includes('-r');
 let channelId = null;
 
+// 디버깅용 로그
+console.log('실행 인자:', args);
+console.log('히스토리 모드:', isHistoricalMode);
+console.log('리셋 모드:', resetData);
+
 // 채널 ID 찾기
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--channel' || args[i] === '-c') {

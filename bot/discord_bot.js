@@ -103,9 +103,13 @@ async function fetchHistoricalData(targetChannelId, resetData = false) {
     
     // 기존 데이터 초기화 옵션이 켜져 있으면 로그 데이터 비우기
     if (resetData) {
-      console.log('기존 로그 데이터를 초기화합니다.');
+      console.log('기존 로그 데이터를 초기화합니다. Reset 옵션:', resetData);
       logData = [];
-      // fileSha는 유지 (파일이 있는 경우 덮어쓰기 위해)
+      // existingMessageIds를 빈 상태로 시작하기 위해 빈 Set으로 초기화
+      const existingMessageIds = new Set();
+      console.log('로그 데이터 초기화 완료. 현재 항목 수:', logData.length);
+    } else {
+      console.log('기존 로그 데이터를 유지합니다. 현재 항목 수:', logData.length);
     }
     
     // 대상 채널 가져오기
@@ -116,7 +120,10 @@ async function fetchHistoricalData(targetChannelId, resetData = false) {
     }
     
     // 이미 수집된 메시지 ID 목록 생성 (중복 방지)
-    const existingMessageIds = new Set(logData.map(item => item.messageId).filter(Boolean));
+    // resetData가 true일 경우 빈 Set으로 시작
+    const existingMessageIds = resetData ? new Set() : new Set(logData.map(item => item.messageId).filter(Boolean));
+    console.log(`기존 메시지 ID 수: ${existingMessageIds.size}`);
+    
     let addedCount = 0;
     
     // 이전 메시지를 가져오기 위한 기준점
@@ -275,6 +282,7 @@ async function startBot() {
 // 이전 데이터 수집 명령어를 포함한 bot-start.js 파일 생성
 async function startBotWithHistoricalData(channelId, resetData = false) {
   try {
+    console.log(`데이터 초기화 모드: ${resetData ? '활성화' : '비활성화'}`);
     await startBot();
     
     // 봇이 로그인된 후 이전 데이터 수집
