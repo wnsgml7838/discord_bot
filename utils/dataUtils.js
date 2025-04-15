@@ -59,21 +59,36 @@ export function getTopSubmitter(logs) {
 
 /**
  * 날짜별 제출 데이터 생성
+ * ==> 실질적인 사용자의 제출시간을 고려하여 '당일 오전 2시 ~ 차일 오전 2시'의 통계 방식을 변경 
  */
 export function getSubmissionsByDate(logs) {
   const submissionsByDate = {};
-  
+
   logs.forEach(log => {
-    const date = log.timestamp.split('T')[0]; // YYYY-MM-DD 형식으로 변환
-    submissionsByDate[date] = (submissionsByDate[date] || 0) + 1;
+    const dateObj = new Date(log.timestamp);
+    const adjustedDate = new Date(dateObj);
+
+    // 기준 시각 이전이면 하루를 빼는 계산을 시행
+    if (dateObj.getHours() < 2) {
+      adjustedDate.setDate(adjustedDate.getDate() - 1);
+    }
+
+    // YYYY-MM-DD 형식으로 날짜 생성 (기존 방식 유지)
+    const dateKey = adjustedDate.toISOString().split('T')[0];
+    submissionsByDate[dateKey] = (submissionsByDate[dateKey] || 0) + 1;
   });
-  
+
   return submissionsByDate;
 }
 
+
 /**
  * 사용자별 최장 연속 인증일수(스트릭) 계산
+ * ==> 관리자 2명은 채널별 특성에 따른 제출과 안내 메시지 전송을 반복하는 경우가 있어 계산이 정확하지 않음
+ * (함수 변경 혹은 삭제 필요)
  */
+
+/*
 export function getUserStreaks(logs) {
   // 사용자별로 로그를 그룹화
   const userLogs = {};
@@ -83,10 +98,12 @@ export function getUserStreaks(logs) {
     }
     userLogs[log.nickname].push(log);
   });
+*/
   
   const streaks = {};
   
   // 각 사용자별로 스트릭 계산
+  // ISSUE ==> 실질적인 사용자의 제출시간을 고려하여 '당일 오전 2시 ~ 차일 오전 2시'의 통계 방식을 변경 필요
   Object.entries(userLogs).forEach(([nickname, userLog]) => {
     // 날짜를 YYYY-MM-DD 형식으로 변환하고 중복 제거 (하루에 여러 번 제출 가능)
     const dates = [...new Set(userLog.map(log => log.timestamp.split('T')[0]))].sort();
@@ -99,6 +116,7 @@ export function getUserStreaks(logs) {
       const currDate = new Date(dates[i]);
       
       // 현재 날짜가 이전 날짜의 다음 날인지 확인
+      // ISSUE ==> 실질적인 사용자의 제출시간을 고려하여 '당일 오전 2시 ~ 차일 오전 2시'의 통계 방식을 변경 필요
       if (differenceInDays(currDate, prevDate) === 1) {
         currentStreak++;
         maxStreak = Math.max(maxStreak, currentStreak);
@@ -134,6 +152,8 @@ export function getMaxStreak(logs) {
 /**
  * 요일별 제출 횟수 계산
  */
+// ISSUE ==> 디스코드 시간 및 요일 계산은 KST가 아닌, GMT를 기준으로 하는 경우가 있으므로 실제 사례 확인 필요
+// ISSUE ==> 디스코드 사용환경별 영문 환경 설정의 경우 하단의 경우가 통용되는지 확인 필요
 export function getSubmissionsByDayOfWeek(logs) {
   const days = ['일', '월', '화', '수', '목', '금', '토'];
   const submissionsByDay = Array(7).fill(0);
@@ -152,6 +172,7 @@ export function getSubmissionsByDayOfWeek(logs) {
 
 /**
  * 시간대별 제출 횟수 계산
+ * ISSUE ==> 디스코드 시간 및 요일 계산은 KST가 아닌, GMT를 기준으로 하는 경우가 있으므로 실제 사례 확인 필요
  */
 export function getSubmissionsByTimeOfDay(logs) {
   const timeRanges = ['06-09', '09-12', '12-15', '15-18', '18-21', '21-24', '00-06'];
