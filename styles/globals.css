@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+}
+
+/* 다크 모드 기본 설정 */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-dark-900 text-gray-100;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 컴포넌트 공통 스타일 */
+@layer components {
+  .card {
+    @apply bg-dark-800 rounded-lg p-5 shadow-card hover:shadow-card-hover transition-shadow;
+  }
+  
+  .stat-value {
+    @apply text-2xl font-bold;
+  }
+  
+  .stat-label {
+    @apply text-sm text-gray-400;
+  }
+  
+  .sidebar-link {
+    @apply flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-dark-800 hover:text-white transition-all;
+  }
+  
+  .sidebar-link.active {
+    @apply bg-dark-800 text-white;
+  }
+
+  .sidebar-icon {
+    @apply w-5 h-5;
+  }
+}
+
+/* 차트 스타일 */
+.chart-container {
+  @apply rounded-lg overflow-hidden;
+}
+
+/* FullCalendar 다크 테마 스타일 */
+.calendar-container {
+  --fc-border-color: rgba(71, 85, 105, 0.3);
+  --fc-button-bg-color: #3b82f6;
+  --fc-button-border-color: #3b82f6;
+  --fc-button-hover-bg-color: #2563eb;
+  --fc-button-hover-border-color: #2563eb;
+  --fc-button-active-bg-color: #1d4ed8;
+  --fc-button-active-border-color: #1d4ed8;
+  --fc-event-bg-color: #3b82f6;
+  --fc-event-border-color: #3b82f6;
+  --fc-page-bg-color: #1e293b;
+  --fc-neutral-bg-color: #334155;
+  --fc-neutral-text-color: #e2e8f0;
+  --fc-theme-standard-border-color: rgba(71, 85, 105, 0.3);
+}
+
+/* FullCalendar 테이블 셀 스타일 */
+.calendar-container .fc-daygrid-day-frame {
+  @apply transition-colors;
+}
+
+/* 오늘 날짜 강조 */
+.calendar-container .fc-day-today {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* 헤더 툴바 스타일링 */
+.calendar-container .fc-toolbar-title {
+  @apply text-gray-100 font-medium;
+}
+
+.calendar-container .fc-button {
+  @apply text-sm shadow-sm;
+}
+
+/* 날짜 숫자 스타일링 */
+.calendar-container .fc-daygrid-day-number {
+  @apply text-gray-300 cursor-pointer;
+}
+
+/* 토/일요일 색상 */
+.calendar-container .fc-day-sat .fc-daygrid-day-number {
+  @apply text-blue-400;
+}
+
+.calendar-container .fc-day-sun .fc-daygrid-day-number {
+  @apply text-red-400;
+}
+
+/* 이벤트 스타일링 */
+.calendar-container .fc-daygrid-event-harness {
+  @apply mx-1;
+}
+
+/* 테이블 헤더(요일) 스타일링 */
+.calendar-container .fc-col-header-cell {
+  @apply bg-dark-700 text-gray-300;
+}
+
+/* 이벤트 도트 스타일링 */
+.calendar-container .fc-daygrid-event-dot {
+  @apply border-primary-500;
+}
+
+/* 이벤트 클릭 가능하게 스타일링 */
+.calendar-container .fc-event {
+  cursor: pointer;
+}
+
+/* 셀 호버 효과 */
+.calendar-container .fc-daygrid-day:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+} 
