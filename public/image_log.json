@@ -1,5 +1,13 @@
 [
   {
+    "nickname": "구성원 2",
+    "timestamp": "2025-04-15T04:52:57.004Z",
+    "timestampStr": "2025-04-15 04:52:57",
+    "image_url": "https://cdn.discordapp.com/attachments/1357237356352241719/1361357475336552568/2025-04-13_6.38.01.png?ex=67fe7672&is=67fd24f2&hm=6383e2678f1e6b3d5d0600a2b741fc612d7f1a8d3034914c94362a13982a7c5f&",
+    "problemCount": null,
+    "messageId": "manual-1744692777004"
+  },
+  {
     "nickname": "구성원 1",
     "timestamp": "2025-04-15T04:52:40.559Z",
     "timestampStr": "2025-04-15 04:52:40",
