@@ -489,7 +489,7 @@ export function getDailyParticipationRate(logs, days = 14) {
     console.log(`[${date}] 참여자 목록: ${[...participants].join(', ')}`);
     
     // 특정 날짜에 대해 상세 로그 표시
-    if (['2024-04-14', '2024-04-15'].includes(date)) {
+    if (['2025-04-14', '2025-04-15'].includes(date)) {
       console.log(`[${date}] 참여자 상세 정보:`, 
         filteredLogs
           .filter(log => getStudyDate(log.timestamp, log.kstTimestampStr || null) === date)
@@ -537,6 +537,8 @@ export function getDailyParticipationRate(logs, days = 14) {
  * @returns {Object} - 날짜별 3일 연속 미제출자 수 데이터
  */
 export function getConsecutiveNonSubmitters(logs, days = 14) {
+  console.log('========== 3일 연속 미제출자 분석 시작 ==========');
+  
   // 봇 제외
   const botNames = ['codingtest_check_bot'];
   const filteredLogs = logs.filter(log => !botNames.includes(log.nickname));
@@ -544,6 +546,9 @@ export function getConsecutiveNonSubmitters(logs, days = 14) {
   // 전체 사용자 목록
   const allUsers = new Set(filteredLogs.map(log => log.nickname));
   const totalUsers = allUsers.size;
+  
+  console.log(`[3일 연속 미제출자 분석] 전체 사용자 수: ${totalUsers}명`);
+  console.log(`[3일 연속 미제출자 분석] 사용자 목록: ${[...allUsers].join(', ')}`);
   
   if (filteredLogs.length === 0 || totalUsers === 0) {
     return { labels: [], data: [], average: 0 };
@@ -566,8 +571,19 @@ export function getConsecutiveNonSubmitters(logs, days = 14) {
   // 날짜 정렬 (최신순)
   const sortedDates = Object.keys(submittersByDate).sort().reverse();
   
+  console.log(`[3일 연속 미제출자 분석] 전체 날짜 수: ${sortedDates.length}일`);
+  console.log(`[3일 연속 미제출자 분석] 날짜 목록: ${sortedDates.join(', ')}`);
+  
   // 최근 days일 + 이전 3일(계산용) 유지
   const recentDates = sortedDates.slice(0, days + 3);
+  
+  console.log(`[3일 연속 미제출자 분석] 분석 대상 날짜: ${recentDates.join(', ')}`);
+  
+  // 날짜별 제출자 수 출력
+  recentDates.forEach(date => {
+    const submitters = submittersByDate[date] || new Set();
+    console.log(`[3일 연속 미제출자 분석] ${date}: 제출자 ${submitters.size}명 / ${totalUsers}명 (${[...submitters].join(', ')})`);
+  });
   
   // 각 날짜별로 3일 연속 미제출자 수 계산
   const results = [];
@@ -591,6 +607,8 @@ export function getConsecutiveNonSubmitters(logs, days = 14) {
       });
     }
     
+    console.log(`[3일 연속 미제출자 분석] ${targetDate}(${dayFormat}) 기준 3일 연속 미제출자: ${consecutiveNonSubmitters.size}명 (${[...consecutiveNonSubmitters].join(', ')})`);
+    
     results.push({
       date: targetDate,
       displayDate: dayFormat,
@@ -613,6 +631,9 @@ export function getConsecutiveNonSubmitters(logs, days = 14) {
   
   // 비율로 변환
   const percentages = data.map(count => parseFloat(((count / totalUsers) * 100).toFixed(1)));
+  
+  console.log(`[3일 연속 미제출자 분석] 평균 미제출자 수: ${average}명 (${parseFloat(((average / totalUsers) * 100).toFixed(1))}%)`);
+  console.log('========== 3일 연속 미제출자 분석 종료 ==========');
   
   return {
     labels,
