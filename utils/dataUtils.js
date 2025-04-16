@@ -72,45 +72,41 @@ export function getSubmissionsByDate(logs) {
 }
 
 /**
- * 한국 시간대(KST) 기준 날짜 객체 생성하기
- * @param {string|Date} date - 날짜 문자열 또는 Date 객체
- * @returns {Date} KST 기준 날짜 객체
+ * UTC 타임스탬프를 KST(한국 표준시)로 변환
+ * @param {string} timestamp - ISO 형식의 타임스탬프
+ * @returns {Date} KST로 변환된 Date 객체
  */
-function toKSTDate(date) {
-  // 이미 Date 객체인 경우
-  if (date instanceof Date) {
-    // 봇에서 생성된 Date 객체는 로컬 시간이므로 그대로 반환
-    return new Date(date);
-  }
+export function toKSTDate(timestamp) {
+  // ISO 문자열에서 Date 객체 생성
+  const date = new Date(timestamp);
   
-  // 문자열인 경우
-  if (typeof date === 'string') {
-    // ISO 형식의 타임스탬프인지 확인
-    // Z로 끝나는 경우(UTC 시간) 또는 +00:00과 같은 타임존 정보가 있는 경우
-    if (date.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(date)) {
-      // 타임존 정보가 있는 경우 UTC에서 KST로 변환 (+9시간)
-      const utcDate = new Date(date);
-      return new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
-    } else {
-      // 타임존 정보가 없는 경우, 이미 로컬 시간(KST)으로 간주하고 그대로 반환
-      return new Date(date);
-    }
-  }
+  // UTC 시간에서 KST로 변환 (UTC+9)
+  const utcDate = new Date(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    date.getUTCHours(),
+    date.getUTCMinutes(),
+    date.getUTCSeconds()
+  );
   
-  // 그 외 케이스는 기본 Date 객체 반환
-  return new Date(date);
+  // 9시간 추가 (KST = UTC+9)
+  utcDate.setHours(utcDate.getHours() + 9);
+  
+  return utcDate;
 }
 
 /**
  * 스터디 기준일 계산 (당일 오전 2시 ~ 다음날 오전 2시)
- * @param {Date} date - KST 날짜 객체
+ * @param {Date|string} date - UTC 날짜 객체 또는 문자열
  * @returns {string} 스터디 기준일 (YYYY-MM-DD)
  */
 function getStudyDate(date) {
+  // 항상 KST로 변환
   const kstDate = toKSTDate(date);
   const hours = kstDate.getHours();
   
-  // 오전 2시 이전이면 전날을 기준일로 설정
+  // KST 기준 오전 2시 이전이면 전날을 기준일로 설정
   if (hours < 2) {
     const prevDay = new Date(kstDate);
     prevDay.setDate(prevDay.getDate() - 1);
@@ -181,44 +177,31 @@ export function getMaxStreak(logs) {
 }
 
 /**
- * 요일별 제출 횟수 계산
+ * 요일별 제출 수 계산 (0: 일요일, 1: 월요일, ..., 6: 토요일)
+ * @param {Array} logs - 로그 데이터 배열
+ * @returns {Object} 요일별 제출 수 객체 {labels: [요일명], data: [제출 수]}
  */
 export function getSubmissionsByDayOfWeek(logs) {
-  // 한국어 요일 고정 (언어 설정과 무관하게 동작)
+  // 요일별 제출 수 초기화 (0: 일요일, 1: 월요일, ..., 6: 토요일)
+  const submissionsByDay = [0, 0, 0, 0, 0, 0, 0];
   const days = ['일', '월', '화', '수', '목', '금', '토'];
-  const submissionsByDay = Array(7).fill(0);
   
   logs.forEach(log => {
-    // toKSTDate 함수를 사용하지 않고 직접 요일 추출
-    let dayIndex;
-    
-    if (typeof log.timestamp === 'string') {
-      // ISO 형식 문자열에서 날짜 직접 파싱
-      const parts = log.timestamp.split('T')[0].split('-');
-      if (parts.length === 3) {
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1; // 월은 0-11 범위
-        const day = parseInt(parts[2], 10);
-        
-        // 날짜 객체 생성 및 요일 추출
-        const date = new Date(year, month, day);
-        dayIndex = date.getDay(); // 0-6 (일-토)
-      } else {
-        // 파싱 실패 시 기본 Date 객체 사용
-        const date = new Date(log.timestamp);
-        dayIndex = date.getDay();
+    try {
+      // 타임스탬프를 KST로 변환하여 요일 계산
+      const date = toKSTDate(log.timestamp);
+      const dayOfWeek = date.getDay(); // 0: 일요일, 6: 토요일
+      
+      // 유효한 요일 인덱스인지 확인
+      if (dayOfWeek >= 0 && dayOfWeek <= 6) {
+        submissionsByDay[dayOfWeek]++;
       }
-    } else {
-      // Date 객체이거나 다른 형식일 경우
-      const date = new Date(log.timestamp);
-      dayIndex = date.getDay();
+    } catch (error) {
+      console.error('요일 계산 중 오류:', error);
+      // 오류 발생 시 현재 날짜의 요일 기준으로 카운트
+      const today = new Date().getDay();
+      submissionsByDay[today]++;
     }
-    
-    // 요일 인덱스 범위 검증 (0-6)
-    dayIndex = Math.max(0, Math.min(6, dayIndex));
-    
-    // 해당 요일 카운트 증가
-    submissionsByDay[dayIndex]++;
   });
   
   return {
@@ -228,48 +211,41 @@ export function getSubmissionsByDayOfWeek(logs) {
 }
 
 /**
- * 시간대별 제출 횟수 계산
+ * 시간대별 제출 수 계산 (0-23시)
+ * @param {Array} logs - 로그 데이터 배열
+ * @returns {Object} 시간대별 제출 수 객체 {labels: [시간], data: [제출 수]}
  */
-export function getSubmissionsByTimeOfDay(logs) {
-  // 1시간 단위로 24시간 표시
-  const timeRanges = [
-    '00-01', '01-02', '02-03', '03-04', '04-05', '05-06', 
-    '06-07', '07-08', '08-09', '09-10', '10-11', '11-12',
-    '12-13', '13-14', '14-15', '15-16', '16-17', '17-18',
-    '18-19', '19-20', '20-21', '21-22', '22-23', '23-24'
-  ];
-  const submissionsByTime = Array(24).fill(0);
-  
+export function getSubmissionsByHour(logs) {
+  // 0-23시까지의 시간대별 제출 수 초기화
+  const submissionsByHour = Array(24).fill(0);
+
+  // 각 로그 항목을 시간대별로 집계
   logs.forEach(log => {
-    // toKSTDate 함수를 사용하지 않고 직접 시간 추출
-    let hours;
-    
-    if (typeof log.timestamp === 'string') {
-      // ISO 형식 문자열에서 시간 직접 추출 (HH 부분)
-      const timeMatch = log.timestamp.match(/T(\d{2}):/);
-      if (timeMatch && timeMatch[1]) {
-        hours = parseInt(timeMatch[1], 10);
-      } else {
-        // 매칭 실패 시 기본값 사용
-        const date = new Date(log.timestamp);
-        hours = date.getHours();
-      }
-    } else {
-      // Date 객체이거나 다른 형식일 경우
+    try {
+      // ISO 형식의 타임스탬프에서 UTC 시간을 추출
       const date = new Date(log.timestamp);
-      hours = date.getHours();
+      
+      // UTC 시간에 9시간을 더해 KST 시간으로 변환
+      // UTC 시간 계산
+      const utcHour = date.getUTCHours();
+      
+      // KST 시간 계산 (UTC+9)
+      const kstHour = (utcHour + 9) % 24;
+      
+      // 시간대별 카운트 증가
+      submissionsByHour[kstHour]++;
+    } catch (error) {
+      console.error('시간대 계산 중 오류:', error, log.timestamp);
+      // 오류 발생 시 무시하고 계속 진행
     }
-    
-    // 시간 범위 검증 (0-23)
-    hours = Math.max(0, Math.min(23, hours));
-    
-    // 해당 시간대 카운트 증가
-    submissionsByTime[hours]++;
   });
-  
+
+  // 시간대 레이블 생성 (00시, 01시, ... 23시)
+  const hourLabels = Array.from({length: 24}, (_, i) => `${i.toString().padStart(2, '0')}시`);
+
   return {
-    labels: timeRanges,
-    data: submissionsByTime
+    labels: hourLabels,
+    data: submissionsByHour
   };
 }
 
