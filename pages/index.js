@@ -241,7 +241,7 @@ export default function Home() {
               {/* 일일 참여율 차트 추가 */}
               <div className="mb-6">
                 <div className="card">
-                  <h3 className="text-base font-medium text-gray-300 mb-2">
+                  <h3 className="card-title mb-2">
                     일일 참여율 (최근 14일) - 평균: {statsData.participationRateData?.average || 0}%
                   </h3>
                   <div className="w-full h-[230px]">
@@ -265,28 +265,28 @@ export default function Home() {
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div className="card">
-                  <h3 className="text-base font-medium text-gray-300 mb-2">
+                  <h3 className="card-title mb-2">
                     요일별 제출 현황
                   </h3>
-                  <div className="w-full h-[230px]">
+                  <div className="w-full h-[280px]">
                     <HeatmapChart 
-                      title=""
                       data={statsData.dayOfWeekData.data} 
                       labels={statsData.dayOfWeekData.labels}
                       colorGradient="blue"
+                      horizontal={true}
                     />
                   </div>
                 </div>
                 <div className="card">
-                  <h3 className="text-base font-medium text-gray-300 mb-2">
+                  <h3 className="card-title mb-2">
                     시간대별 제출 현황
                   </h3>
-                  <div className="w-full h-[230px]">
+                  <div className="w-full h-[280px]">
                     <HeatmapChart 
-                      title=""
                       data={statsData.timeOfDayData.data} 
                       labels={statsData.timeOfDayData.labels}
                       colorGradient="green"
+                      horizontal={true}
                     />
                   </div>
                 </div>
@@ -296,7 +296,7 @@ export default function Home() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* 최근 3일간 미제출자 수 추이 */}
                 <div className="card">
-                  <h3 className="text-base font-medium text-gray-300 mb-2">
+                  <h3 className="card-title mb-2">
                     최근 3일간 미제출자 수 추이 - 평균: {statsData.consecutiveNonSubmittersData?.average || 0}명
                   </h3>
                   <div className="w-full h-[230px]">
@@ -325,6 +325,7 @@ export default function Home() {
                         data={statsData.reminderEffectData?.data || [0, 0]}
                         labels={statsData.reminderEffectData?.labels || ['리마인더 전', '리마인더 후']}
                         colorGradient="amber"
+                        horizontal={false}
                         tooltipCallback={(context) => `${context.dataset.data[context.dataIndex]}% 제출`}
                       />
                       <div className="mt-4 text-center text-sm text-gray-800">

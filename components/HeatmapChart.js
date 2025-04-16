@@ -34,7 +34,8 @@ const HeatmapChart = ({
   labels, 
   colorGradient = 'blue',
   tooltipCallback,
-  extraInfo
+  extraInfo,
+  horizontal
 }) => {
   if (!data || !labels) {
     return <div className="text-center text-gray-500 py-8">데이터가 없습니다.</div>;
@@ -75,7 +76,7 @@ const HeatmapChart = ({
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    indexAxis: 'y',
+    indexAxis: horizontal === false ? 'y' : 'x',
     layout: {
       padding: 5,
     },
@@ -83,6 +84,17 @@ const HeatmapChart = ({
       x: {
         grid: {
           display: false,
+        },
+        ticks: {
+          display: true,
+          color: 'rgba(107, 114, 128, 0.8)',
+          font: function(context) {
+            const autoFontSize = Math.min(14, Math.max(10, 20 - (horizontal === false ? labels.length / 8 : 2)));
+            return {
+              size: Math.max(10, autoFontSize),
+              weight: '500'
+            }
+          }
         },
       },
       y: {
@@ -94,9 +106,9 @@ const HeatmapChart = ({
           display: true,
           color: 'rgba(107, 114, 128, 0.8)',
           font: function(context) {
-            const autoFontSize = Math.min(12, 20 - labels.length / 2);
+            const autoFontSize = Math.min(14, Math.max(10, 20 - (horizontal === false ? 2 : labels.length / 8)));
             return {
-              size: Math.max(8, autoFontSize),
+              size: Math.max(10, autoFontSize),
               weight: '500'
             }
           }
@@ -138,8 +150,8 @@ const HeatmapChart = ({
   };
 
   return (
-    <div className="card h-[230px]">
-      <div className="w-full h-[230px]">
+    <div className="card h-[280px]">
+      <div className="w-full h-[280px]">
         <Bar data={chartData} options={options} />
       </div>
       {extraInfo && (
