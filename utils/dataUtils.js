@@ -77,80 +77,30 @@ export function getSubmissionsByDate(logs) {
  * @returns {Date} KST로 변환된 Date 객체
  */
 export function toKSTDate(timestamp) {
-  // ISO 문자열에서 Date 객체 생성
   const date = new Date(timestamp);
-  
-  // UTC 시간에서 KST로 변환 (UTC+9)
-  const utcDate = new Date(
-    date.getUTCFullYear(),
-    date.getUTCMonth(),
-    date.getUTCDate(),
-    date.getUTCHours(),
-    date.getUTCMinutes(),
-    date.getUTCSeconds()
-  );
-  
-  // 9시간 추가 (KST = UTC+9)
-  utcDate.setHours(utcDate.getHours() + 9);
-  
-  return utcDate;
+  // KST는 UTC+9
+  date.setHours(date.getHours() + 9);
+  return date;
 }
 
 /**
  * 스터디 기준일 계산 (당일 오전 2시 ~ 다음날 오전 2시)
- * @param {Date|string} timestamp - UTC 날짜 객체 또는 문자열
+ * @param {Date|string} date - UTC 날짜 객체 또는 문자열
  * @returns {string} 스터디 기준일 (YYYY-MM-DD)
  */
-function getStudyDate(timestamp) {
-  // ISO 형식의 타임스탬프에서 Date 객체 생성
-  const date = new Date(timestamp);
-  
-  // UTC 날짜와 시간 성분 추출
-  const utcYear = date.getUTCFullYear();
-  const utcMonth = date.getUTCMonth();
-  const utcDate = date.getUTCDate();
-  const utcHours = date.getUTCHours();
-  
-  // KST 시간 계산 (UTC+9)
-  let kstHours = (utcHours + 9) % 24;
-  let kstDate = utcDate;
-  let kstMonth = utcMonth;
-  let kstYear = utcYear;
-  
-  // UTC 기준으로 날짜 변경 처리
-  if (utcHours + 9 >= 24) {
-    // 날짜가 바뀌는 경우
-    kstDate += 1;
-    
-    // 월말 처리
-    const lastDayOfMonth = new Date(utcYear, utcMonth + 1, 0).getDate();
-    if (kstDate > lastDayOfMonth) {
-      kstDate = 1;
-      kstMonth += 1;
-      
-      // 연말 처리
-      if (kstMonth > 11) {
-        kstMonth = 0;
-        kstYear += 1;
-      }
-    }
-  }
+function getStudyDate(date) {
+  // 항상 KST로 변환
+  const kstDate = toKSTDate(date);
+  const hours = kstDate.getHours();
   
   // KST 기준 오전 2시 이전이면 전날을 기준일로 설정
-  if (kstHours < 2) {
-    // 전날 날짜 계산
-    if (kstDate === 1) {
-      // 월초인 경우 전 월의 마지막 날로 설정
-      kstMonth = kstMonth === 0 ? 11 : kstMonth - 1;
-      kstYear = kstMonth === 11 ? kstYear - 1 : kstYear;
-      kstDate = new Date(kstYear, kstMonth + 1, 0).getDate();
-    } else {
-      kstDate -= 1;
-    }
+  if (hours < 2) {
+    const prevDay = new Date(kstDate);
+    prevDay.setDate(prevDay.getDate() - 1);
+    return format(prevDay, 'yyyy-MM-dd');
   }
   
-  // YYYY-MM-DD 형식의 문자열로 반환
-  return `${kstYear}-${String(kstMonth + 1).padStart(2, '0')}-${String(kstDate).padStart(2, '0')}`;
+  return format(kstDate, 'yyyy-MM-dd');
 }
 
 /**
@@ -225,48 +175,17 @@ export function getSubmissionsByDayOfWeek(logs) {
   
   logs.forEach(log => {
     try {
-      // ISO 형식의 타임스탬프에서 Date 객체 생성
-      const date = new Date(log.timestamp);
+      // 타임스탬프를 KST로 변환하여 요일 계산
+      const date = toKSTDate(log.timestamp);
+      const dayOfWeek = date.getDay(); // 0: 일요일, 6: 토요일
       
-      // UTC 날짜와 시간 성분 추출
-      const utcYear = date.getUTCFullYear();
-      const utcMonth = date.getUTCMonth();
-      const utcDate = date.getUTCDate();
-      const utcHours = date.getUTCHours();
-      
-      // KST 시간 계산 (UTC+9)
-      // 시간이 15시(UTC) 이상이면 날짜가 변경됨
-      let kstDate = utcDate;
-      let kstMonth = utcMonth;
-      let kstYear = utcYear;
-      
-      if (utcHours + 9 >= 24) {
-        // 날짜가 바뀌는 경우
-        kstDate += 1;
-        
-        // 월말 처리
-        const lastDayOfMonth = new Date(utcYear, utcMonth + 1, 0).getDate();
-        if (kstDate > lastDayOfMonth) {
-          kstDate = 1;
-          kstMonth += 1;
-          
-          // 연말 처리
-          if (kstMonth > 11) {
-            kstMonth = 0;
-            kstYear += 1;
-          }
-        }
+      // 유효한 요일 인덱스인지 확인
+      if (dayOfWeek >= 0 && dayOfWeek <= 6) {
+        submissionsByDay[dayOfWeek]++;
       }
-      
-      // KST 기준 날짜 객체 생성
-      const kstDateObj = new Date(kstYear, kstMonth, kstDate);
-      const dayOfWeek = kstDateObj.getDay(); // 0: 일요일, 6: 토요일
-      
-      // 요일별 카운트 증가
-      submissionsByDay[dayOfWeek]++;
     } catch (error) {
-      console.error('요일 계산 중 오류:', error, log.timestamp);
-      // 오류 발생 시 현재 날짜의 요일 기준으로 카운트 (로컬 시간 기준)
+      console.error('요일 계산 중 오류:', error);
+      // 오류 발생 시 현재 날짜의 요일 기준으로 카운트
       const today = new Date().getDay();
       submissionsByDay[today]++;
     }
@@ -289,23 +208,10 @@ export function getSubmissionsByHour(logs) {
 
   // 각 로그 항목을 시간대별로 집계
   logs.forEach(log => {
-    try {
-      // ISO 형식의 타임스탬프에서 UTC 시간을 추출
-      const date = new Date(log.timestamp);
-      
-      // UTC 시간에 9시간을 더해 KST 시간으로 변환
-      // UTC 시간 계산
-      const utcHour = date.getUTCHours();
-      
-      // KST 시간 계산 (UTC+9)
-      const kstHour = (utcHour + 9) % 24;
-      
-      // 시간대별 카운트 증가
-      submissionsByHour[kstHour]++;
-    } catch (error) {
-      console.error('시간대 계산 중 오류:', error, log.timestamp);
-      // 오류 발생 시 무시하고 계속 진행
-    }
+    const timestamp = log.timestamp;
+    // KST 시간으로 변환하여 시간(hour) 추출
+    const hour = toKSTDate(timestamp).getHours();
+    submissionsByHour[hour]++;
   });
 
   // 시간대 레이블 생성 (00시, 01시, ... 23시)
@@ -468,24 +374,29 @@ export function getDailyParticipationRate(logs, days = 14) {
   );
   
   // 실제 사용자 수 (봇 제외)
-  const totalUsers = allUsers.size;
+  // const totalUsers = allUsers.size; // 동적으로 계산
+  const totalUsers = 31; // 고정 사용자 수 (YEARDREAM 5기 스터디 기준)
   
   // 디버깅을 위해 사용자 정보 로깅
-  console.log(`전체 사용자 수 (봇 제외): ${totalUsers}`);
-  console.log(`모든 사용자 목록:`, [...allUsers]);
+  console.log(`필터링 후 사용자 수: ${allUsers.size}`);
+  console.log(`계산에 사용할 총 사용자 수: ${totalUsers}`);
   
   if (totalUsers === 0) return { labels: [], data: [], average: 0 };
   
-  // 스터디 날짜 범위 계산 (현재로부터 days일 전까지)
-  const studyDates = [];
-  const dailyParticipation = {};
+  // 날짜 범위를 생성하고 초기화 (과거 -> 현재 순서)
+  const dateData = [];
   
-  // 최근 days일의 날짜 문자열 생성 (오늘 포함)
-  for (let i = 0; i < days; i++) {
+  // 과거부터 현재까지의 날짜 범위 생성 (days-1일 전부터 오늘까지)
+  for (let i = days - 1; i >= 0; i--) {
     const date = subDays(today, i);
     const dateStr = format(date, 'yyyy-MM-dd');
-    studyDates.push(dateStr);
-    dailyParticipation[dateStr] = new Set();
+    const displayDate = format(date, 'MM.dd', { locale: ko });
+    
+    dateData.push({
+      date: dateStr,
+      displayDate: displayDate,
+      participants: new Set()
+    });
   }
   
   // 로그 데이터 분석하여 날짜별 제출자 집계 (스터디 기준일 사용)
@@ -496,39 +407,32 @@ export function getDailyParticipationRate(logs, days = 14) {
     // 스터디 기준일 적용 (당일 오전 2시 ~ 차일 오전 2시)
     const studyDate = getStudyDate(log.timestamp);
     
-    // 지정된 날짜 범위 내에 있는 경우만 집계
-    if (dailyParticipation[studyDate]) {
-      dailyParticipation[studyDate].add(log.nickname);
+    // 해당 날짜를 찾아서 참여자 추가
+    const dateEntry = dateData.find(entry => entry.date === studyDate);
+    if (dateEntry) {
+      dateEntry.participants.add(log.nickname);
     }
   });
   
-  // 날짜 순서대로 정렬 (과거 -> 현재)
-  const sortedDates = studyDates.sort();
-  
-  // 날짜별 참여율 계산
-  const participationData = sortedDates.map(date => {
-    const participants = dailyParticipation[date].size;
-    const participantsList = [...dailyParticipation[date]].join(', ');
-    console.log(`${date} 참여자 수: ${participants}명 / ${totalUsers}명 (${(participants/totalUsers*100).toFixed(1)}%)`);
-    console.log(`${date} 참여자 목록: ${participantsList}`);
-    
-    const rate = totalUsers > 0 ? (participants / totalUsers * 100).toFixed(1) : 0;
-    return parseFloat(rate);
+  // 각 날짜의 참여율 계산
+  dateData.forEach(entry => {
+    const participants = entry.participants.size;
+    console.log(`${entry.date} (${entry.displayDate}) 참여자 수: ${participants}명 / ${totalUsers}명 (${(participants/totalUsers*100).toFixed(1)}%)`);
+    entry.rate = parseFloat((participants / totalUsers * 100).toFixed(1));
   });
   
-  // 날짜 라벨 포맷팅 (MM.DD)
-  const dateLabels = sortedDates.map(date => 
-    format(parseISO(date), 'MM.dd', { locale: ko })
-  );
+  // 라벨과 데이터 분리
+  const labels = dateData.map(entry => entry.displayDate);
+  const data = dateData.map(entry => entry.rate);
   
   // 평균 참여율 계산
-  const average = participationData.length > 0 
-    ? (participationData.reduce((acc, val) => acc + val, 0) / participationData.length).toFixed(1) 
+  const average = data.length > 0 
+    ? (data.reduce((acc, val) => acc + val, 0) / data.length).toFixed(1) 
     : 0;
   
   return {
-    labels: dateLabels,
-    data: participationData,
+    labels,
+    data,
     average: parseFloat(average)
   };
 } 
