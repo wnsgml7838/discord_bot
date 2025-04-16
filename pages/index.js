@@ -13,7 +13,7 @@ import {
   getTopSubmitter, getSubmissionsByDayOfWeek, getSubmissionsByHour,
   getTop5Users, getRecentNonSubmitters, getRecentSubmissions,
   getTrendingUsers, getInactiveUsers, getTopStreakUsers,
-  getDailyParticipationRate
+  getDailyParticipationRate, getConsecutiveNonSubmitters, getReminderEffectData
 } from '../utils/dataUtils';
 
 // 컴포넌트 임포트
@@ -41,7 +41,9 @@ export default function Home() {
     recentSubmissions: [],
     trendingUsers: [],
     inactiveUsers: [],
-    topStreakUsers: []
+    topStreakUsers: [],
+    consecutiveNonSubmittersData: { labels: [], data: [], average: 0 },
+    reminderEffectData: { labels: [], data: [] }
   });
 
   useEffect(() => {
@@ -90,7 +92,14 @@ export default function Home() {
     const top5Users = getTop5Users(logs);
     
     // 기간별 추이 데이터 (Top 5 사용자)
-    const top5LineChartData = prepareLineChartData(logs, top5Users);
+    // 기존 Top 5 랭커 제출 추이 데이터 대신 새로운 데이터 사용
+    // const top5LineChartData = prepareLineChartData(logs, top5Users);
+    
+    // 최근 3일간 미제출자 수 추이 데이터
+    const consecutiveNonSubmittersData = getConsecutiveNonSubmitters(logs, 14);
+    
+    // 리마인더 전후 22시 이후 제출 비율 비교 데이터
+    const reminderEffectData = getReminderEffectData(logs);
     
     // 하단 영역 알림 데이터
     const nonSubmitters = getRecentNonSubmitters(logs, 3);
@@ -108,7 +117,8 @@ export default function Home() {
       timeOfDayData,
       participationRateData,
       top5Users,
-      top5LineChartData,
+      consecutiveNonSubmittersData,
+      reminderEffectData,
       nonSubmitters,
       recentSubmissions,
       trendingUsers,
@@ -261,15 +271,48 @@ export default function Home() {
                 />
               </div>
               
-              {statsData.top5LineChartData && (
-                <div className="mt-6">
-                  <LineChart 
-                    title="Top 5 랭커의 제출 추이 (최근 14일)" 
-                    datasets={statsData.top5LineChartData.datasets} 
-                    labels={statsData.top5LineChartData.labels}
-                  />
-                </div>
-              )}
+              {/* 새로운 차트 1: 최근 3일간 미제출자 수 추이 */}
+              <div className="mb-6">
+                <LineChart 
+                  title={`최근 3일간 미제출자 수 추이 - 평균: ${statsData.consecutiveNonSubmittersData?.average || 0}명 (${statsData.consecutiveNonSubmittersData?.percentageAverage || 0}%)`}
+                  datasets={[{
+                    label: '미제출자 수',
+                    data: statsData.consecutiveNonSubmittersData?.data || [],
+                    borderColor: 'rgba(239, 68, 68, 1)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)'
+                  }]}
+                  labels={statsData.consecutiveNonSubmittersData?.labels || []}
+                  yAxisLabel="인원수"
+                  tooltipLabel="미제출자"
+                  tooltipSuffix="명"
+                />
+              </div>
+              
+              {/* 새로운 차트 2: 리마인더 전후 22시 이후 제출 비율 비교 */}
+              <div className="mb-6">
+                <HeatmapChart 
+                  title={`리마인더 효과 분석: 22시~01시 사이 제출 비율 변화`}
+                  data={statsData.reminderEffectData?.data || []}
+                  labels={statsData.reminderEffectData?.labels || []}
+                  colorGradient="purple"
+                  tooltipCallback={(value, context) => {
+                    const index = context.dataIndex;
+                    const isBeforeReminder = index === 0;
+                    const count = isBeforeReminder 
+                      ? statsData.reminderEffectData?.beforeCount 
+                      : statsData.reminderEffectData?.afterCount;
+                    const total = isBeforeReminder 
+                      ? statsData.reminderEffectData?.beforeTotal
+                      : statsData.reminderEffectData?.afterTotal;
+                    return `${value}% (${count}/${total})`;
+                  }}
+                  extraInfo={
+                    statsData.reminderEffectData?.afterReminder > statsData.reminderEffectData?.beforeReminder
+                      ? `리마인더 효과: +${(statsData.reminderEffectData?.afterReminder - statsData.reminderEffectData?.beforeReminder).toFixed(1)}%p 증가`
+                      : `리마인더 효과 없음: ${(statsData.reminderEffectData?.beforeReminder - statsData.reminderEffectData?.afterReminder).toFixed(1)}%p 감소`
+                  }
+                />
+              </div>
             </section>
             
             {/* 📉 하단 영역: 알림 및 갤러리 */}

@@ -528,4 +528,201 @@ export function getDailyParticipationRate(logs, days = 14) {
     data,
     average
   };
+}
+
+/**
+ * 최근 14일간 "최근 3일간 미제출자 수"의 변화 추이
+ * @param {Array} logs - 로그 데이터
+ * @param {number} days - 조회할 일수 (기본값: 14일)
+ * @returns {Object} - 날짜별 3일 연속 미제출자 수 데이터
+ */
+export function getConsecutiveNonSubmitters(logs, days = 14) {
+  // 봇 제외
+  const botNames = ['codingtest_check_bot'];
+  const filteredLogs = logs.filter(log => !botNames.includes(log.nickname));
+  
+  // 전체 사용자 목록
+  const allUsers = new Set(filteredLogs.map(log => log.nickname));
+  const totalUsers = allUsers.size;
+  
+  if (filteredLogs.length === 0 || totalUsers === 0) {
+    return { labels: [], data: [], average: 0 };
+  }
+  
+  // 날짜별 제출자 맵 생성
+  const submittersByDate = {};
+  
+  // 모든 로그를 순회하며 날짜별 제출자 맵 생성
+  filteredLogs.forEach(log => {
+    const studyDate = getStudyDate(log.timestamp, log.kstTimestampStr || null);
+    
+    if (!submittersByDate[studyDate]) {
+      submittersByDate[studyDate] = new Set();
+    }
+    
+    submittersByDate[studyDate].add(log.nickname);
+  });
+  
+  // 날짜 정렬 (최신순)
+  const sortedDates = Object.keys(submittersByDate).sort().reverse();
+  
+  // 최근 days일 + 이전 3일(계산용) 유지
+  const recentDates = sortedDates.slice(0, days + 3);
+  
+  // 각 날짜별로 3일 연속 미제출자 수 계산
+  const results = [];
+  
+  // 포함된 날짜들만 계산 (가장 오래된 3일은 계산용으로만 사용)
+  for (let i = 0; i < recentDates.length - 3; i++) {
+    const targetDate = recentDates[i];
+    const dayFormat = format(parseISO(targetDate), 'MM.dd', { locale: ko });
+    
+    // 3일 연속 미제출자 계산
+    const consecutiveNonSubmitters = new Set([...allUsers]);
+    
+    // 해당 날짜와 이전 2일 동안의 제출자 제외
+    for (let j = i; j < i + 3; j++) {
+      const checkDate = recentDates[j];
+      const submitters = submittersByDate[checkDate] || new Set();
+      
+      // 제출자는 미제출자 집합에서 제외
+      submitters.forEach(nickname => {
+        consecutiveNonSubmitters.delete(nickname);
+      });
+    }
+    
+    results.push({
+      date: targetDate,
+      displayDate: dayFormat,
+      count: consecutiveNonSubmitters.size,
+      nonSubmitters: [...consecutiveNonSubmitters]
+    });
+  }
+  
+  // 날짜순 정렬 (과거 -> 현재)
+  results.reverse();
+  
+  // 라벨과 데이터 추출
+  const labels = results.map(item => item.displayDate);
+  const data = results.map(item => item.count);
+  
+  // 평균 미제출자 수 계산
+  const average = data.length > 0
+    ? parseFloat((data.reduce((acc, val) => acc + val, 0) / data.length).toFixed(1))
+    : 0;
+  
+  // 비율로 변환
+  const percentages = data.map(count => parseFloat(((count / totalUsers) * 100).toFixed(1)));
+  
+  return {
+    labels,
+    data,
+    percentages,
+    average,
+    percentageAverage: parseFloat(((average / totalUsers) * 100).toFixed(1))
+  };
+}
+
+/**
+ * 리마인더 전후 22시 이후 제출 비율 비교
+ * @param {Array} logs - 로그 데이터
+ * @returns {Object} - 리마인더 전/후 22시 이후 제출 비율
+ */
+export function getReminderEffectData(logs) {
+  // 봇 제외
+  const botNames = ['codingtest_check_bot'];
+  const filteredLogs = logs.filter(log => !botNames.includes(log.nickname));
+  
+  if (filteredLogs.length === 0) {
+    return {
+      labels: ['리마인더 전', '리마인더 후'],
+      beforeReminder: 0,
+      afterReminder: 0
+    };
+  }
+  
+  // 리마인더 도입 날짜 (2024-04-06)
+  const reminderStartDate = '2024-04-06';
+  
+  // 리마인더 이전/이후 데이터 분리
+  const beforeReminderLogs = filteredLogs.filter(log => {
+    const studyDate = getStudyDate(log.timestamp, log.kstTimestampStr || null);
+    return isBeforeOrEqual(studyDate, '2024-04-05') && isAfterOrEqual(studyDate, '2024-04-03');
+  });
+  
+  const afterReminderLogs = filteredLogs.filter(log => {
+    const studyDate = getStudyDate(log.timestamp, log.kstTimestampStr || null);
+    return isAfterOrEqual(studyDate, reminderStartDate);
+  });
+  
+  // 리마인더 전 22시 이후 제출 비율 계산
+  const beforeReminderCount = beforeReminderLogs.length;
+  const beforeReminderLateCount = beforeReminderLogs.filter(log => {
+    // KST 시간 확인
+    let kstHour;
+    if (log.kstTimestampStr) {
+      // kstTimestampStr 형식이 "2024-04-05 23:45:12" 형태라고 가정
+      const timeStr = log.kstTimestampStr.split(' ')[1];
+      kstHour = parseInt(timeStr.split(':')[0], 10);
+    } else {
+      // UTC 시간에서 KST 시간 계산
+      const date = new Date(log.timestamp);
+      kstHour = (date.getUTCHours() + 9) % 24;
+    }
+    // 22시~01시 사이 제출 확인
+    return kstHour >= 22 || kstHour <= 1;
+  }).length;
+  
+  // 리마인더 후 22시 이후 제출 비율 계산
+  const afterReminderCount = afterReminderLogs.length;
+  const afterReminderLateCount = afterReminderLogs.filter(log => {
+    // KST 시간 확인
+    let kstHour;
+    if (log.kstTimestampStr) {
+      // kstTimestampStr 형식이 "2024-04-05 23:45:12" 형태라고 가정
+      const timeStr = log.kstTimestampStr.split(' ')[1];
+      kstHour = parseInt(timeStr.split(':')[0], 10);
+    } else {
+      // UTC 시간에서 KST 시간 계산
+      const date = new Date(log.timestamp);
+      kstHour = (date.getUTCHours() + 9) % 24;
+    }
+    // 22시~01시 사이 제출 확인
+    return kstHour >= 22 || kstHour <= 1;
+  }).length;
+  
+  const beforeReminderPercentage = beforeReminderCount === 0 ? 0 
+    : parseFloat(((beforeReminderLateCount / beforeReminderCount) * 100).toFixed(1));
+  
+  const afterReminderPercentage = afterReminderCount === 0 ? 0 
+    : parseFloat(((afterReminderLateCount / afterReminderCount) * 100).toFixed(1));
+  
+  return {
+    labels: ['리마인더 전', '리마인더 후'],
+    beforeReminder: beforeReminderPercentage,
+    afterReminder: afterReminderPercentage,
+    data: [beforeReminderPercentage, afterReminderPercentage],
+    beforeCount: beforeReminderLateCount,
+    beforeTotal: beforeReminderCount,
+    afterCount: afterReminderLateCount,
+    afterTotal: afterReminderCount
+  };
+}
+
+/**
+ * 날짜 비교 유틸리티 - 이전이거나 같은 날짜
+ */
+function isBeforeOrEqual(date1, date2) {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  return d1 <= d2;
+}
+
+/**
+ * 날짜 비교 유틸리티 - 이후이거나 같은 날짜
+ */
+function isAfterOrEqual(date1, date2) {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  return d1 >= d2;
 } 
