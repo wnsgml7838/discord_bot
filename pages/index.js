@@ -299,7 +299,7 @@ export default function Home() {
                   <h3 className="card-title mb-2">
                     최근 3일간 미제출자 수 추이 - 평균: {statsData.consecutiveNonSubmittersData?.average || 0}명
                   </h3>
-                  <div className="w-full h-[230px]">
+                  <div className="w-full h-[280px]">
                     <LineChart 
                       title=""
                       datasets={[{
@@ -317,28 +317,26 @@ export default function Home() {
                 </div>
                 
                 {/* 리마인더 전후 22시 이후 제출 비율 비교 */}
-                <div className="col-span-12 md:col-span-6 lg:col-span-6">
-                  <div className="card">
-                    <h3 className="card-title mb-2">리마인더 효과 (22시 이후 제출 비율)</h3>
-                    <div className="relative">
-                      <HeatmapChart
-                        data={statsData.reminderEffectData?.data || [0, 0]}
-                        labels={statsData.reminderEffectData?.labels || ['리마인더 전', '리마인더 후']}
-                        colorGradient="amber"
-                        horizontal={false}
-                        tooltipCallback={(context) => `${context.dataset.data[context.dataIndex]}% 제출`}
-                      />
-                      <div className="mt-4 text-center text-sm text-gray-800">
-                        <p className="font-medium">
-                          리마인더 효과: 
-                          <span className={`ml-1 ${statsData.reminderEffectData?.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {statsData.reminderEffectData?.difference > 0 ? '+' : ''}{statsData.reminderEffectData?.difference || 0}%p 증가
-                          </span>
-                          <span className="block mt-1 text-xs text-gray-600">
-                            (전: {statsData.reminderEffectData?.beforeCount || 0}개, 후: {statsData.reminderEffectData?.afterCount || 0}개)
-                          </span>
-                        </p>
-                      </div>
+                <div className="card">
+                  <h3 className="card-title mb-2">리마인더 효과 (22시 이후 제출 비율)</h3>
+                  <div className="relative">
+                    <HeatmapChart
+                      data={statsData.reminderEffectData?.data || [0, 0]}
+                      labels={statsData.reminderEffectData?.labels || ['리마인더 전', '리마인더 후']}
+                      colorGradient="amber"
+                      horizontal={false}
+                      tooltipCallback={(context) => `${context.dataset.data[context.dataIndex]}% 제출`}
+                    />
+                    <div className="mt-4 text-center text-sm text-gray-300">
+                      <p className="font-medium">
+                        리마인더 효과: 
+                        <span className={`ml-1 ${statsData.reminderEffectData?.difference > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {statsData.reminderEffectData?.difference > 0 ? '+' : ''}{statsData.reminderEffectData?.difference || 0}%p 증가
+                        </span>
+                        <span className="block mt-1 text-xs text-gray-500">
+                          (전: {statsData.reminderEffectData?.beforeCount || 0}개, 후: {statsData.reminderEffectData?.afterCount || 0}개)
+                        </span>
+                      </p>
                     </div>
                   </div>
                 </div>
