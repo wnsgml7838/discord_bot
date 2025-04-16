@@ -698,6 +698,11 @@ export function getReminderEffectData(logs) {
   const afterReminderPercentage = afterReminderCount === 0 ? 0 
     : parseFloat(((afterReminderLateCount / afterReminderCount) * 100).toFixed(1));
   
+  console.log('========== 리마인더 효과 분석 ==========');
+  console.log(`리마인더 전 데이터: ${beforeReminderCount}개, 22시 이후: ${beforeReminderLateCount}개, 비율: ${beforeReminderPercentage}%`);
+  console.log(`리마인더 후 데이터: ${afterReminderCount}개, 22시 이후: ${afterReminderLateCount}개, 비율: ${afterReminderPercentage}%`);
+  
+  // 데이터를 배열로 반환
   return {
     labels: ['리마인더 전', '리마인더 후'],
     beforeReminder: beforeReminderPercentage,
@@ -706,7 +711,12 @@ export function getReminderEffectData(logs) {
     beforeCount: beforeReminderLateCount,
     beforeTotal: beforeReminderCount,
     afterCount: afterReminderLateCount,
-    afterTotal: afterReminderCount
+    afterTotal: afterReminderCount,
+    // 디버깅 정보 추가
+    debug: {
+      beforeLogs: beforeReminderLogs.length,
+      afterLogs: afterReminderLogs.length
+    }
   };
 }
 

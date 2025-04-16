@@ -343,10 +343,12 @@ export default function Home() {
                   {statsData.reminderEffectData?.afterReminder > statsData.reminderEffectData?.beforeReminder ? (
                     <div className="mt-1 text-center text-sm text-gray-500 italic">
                       리마인더 효과: +{(statsData.reminderEffectData?.afterReminder - statsData.reminderEffectData?.beforeReminder).toFixed(1)}%p 증가
+                      {statsData.reminderEffectData?.debug && ` (전: ${statsData.reminderEffectData.debug.beforeLogs}개, 후: ${statsData.reminderEffectData.debug.afterLogs}개)`}
                     </div>
                   ) : (
                     <div className="mt-1 text-center text-sm text-gray-500 italic">
                       리마인더 효과 없음: {(statsData.reminderEffectData?.beforeReminder - statsData.reminderEffectData?.afterReminder).toFixed(1)}%p 감소
+                      {statsData.reminderEffectData?.debug && ` (전: ${statsData.reminderEffectData.debug.beforeLogs}개, 후: ${statsData.reminderEffectData.debug.afterLogs}개)`}
                     </div>
                   )}
                 </div>
