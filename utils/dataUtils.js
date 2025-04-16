@@ -98,22 +98,59 @@ export function toKSTDate(timestamp) {
 
 /**
  * 스터디 기준일 계산 (당일 오전 2시 ~ 다음날 오전 2시)
- * @param {Date|string} date - UTC 날짜 객체 또는 문자열
+ * @param {Date|string} timestamp - UTC 날짜 객체 또는 문자열
  * @returns {string} 스터디 기준일 (YYYY-MM-DD)
  */
-function getStudyDate(date) {
-  // 항상 KST로 변환
-  const kstDate = toKSTDate(date);
-  const hours = kstDate.getHours();
+function getStudyDate(timestamp) {
+  // ISO 형식의 타임스탬프에서 Date 객체 생성
+  const date = new Date(timestamp);
   
-  // KST 기준 오전 2시 이전이면 전날을 기준일로 설정
-  if (hours < 2) {
-    const prevDay = new Date(kstDate);
-    prevDay.setDate(prevDay.getDate() - 1);
-    return format(prevDay, 'yyyy-MM-dd');
+  // UTC 날짜와 시간 성분 추출
+  const utcYear = date.getUTCFullYear();
+  const utcMonth = date.getUTCMonth();
+  const utcDate = date.getUTCDate();
+  const utcHours = date.getUTCHours();
+  
+  // KST 시간 계산 (UTC+9)
+  let kstHours = (utcHours + 9) % 24;
+  let kstDate = utcDate;
+  let kstMonth = utcMonth;
+  let kstYear = utcYear;
+  
+  // UTC 기준으로 날짜 변경 처리
+  if (utcHours + 9 >= 24) {
+    // 날짜가 바뀌는 경우
+    kstDate += 1;
+    
+    // 월말 처리
+    const lastDayOfMonth = new Date(utcYear, utcMonth + 1, 0).getDate();
+    if (kstDate > lastDayOfMonth) {
+      kstDate = 1;
+      kstMonth += 1;
+      
+      // 연말 처리
+      if (kstMonth > 11) {
+        kstMonth = 0;
+        kstYear += 1;
+      }
+    }
   }
   
-  return format(kstDate, 'yyyy-MM-dd');
+  // KST 기준 오전 2시 이전이면 전날을 기준일로 설정
+  if (kstHours < 2) {
+    // 전날 날짜 계산
+    if (kstDate === 1) {
+      // 월초인 경우 전 월의 마지막 날로 설정
+      kstMonth = kstMonth === 0 ? 11 : kstMonth - 1;
+      kstYear = kstMonth === 11 ? kstYear - 1 : kstYear;
+      kstDate = new Date(kstYear, kstMonth + 1, 0).getDate();
+    } else {
+      kstDate -= 1;
+    }
+  }
+  
+  // YYYY-MM-DD 형식의 문자열로 반환
+  return `${kstYear}-${String(kstMonth + 1).padStart(2, '0')}-${String(kstDate).padStart(2, '0')}`;
 }
 
 /**
