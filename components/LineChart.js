@@ -140,9 +140,8 @@ const LineChart = ({
   };
   
   return (
-    <div className="card h-[350px]">
-      <h3 className="text-base font-medium text-gray-300 mb-2">{title}</h3>
-      <div className="h-[300px]">
+    <div className="card h-[230px]">
+      <div className="w-full h-[230px]">
         <Line data={chartData} options={options} />
       </div>
     </div>
