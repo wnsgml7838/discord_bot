@@ -189,9 +189,35 @@ export function getSubmissionsByDayOfWeek(logs) {
   const submissionsByDay = Array(7).fill(0);
   
   logs.forEach(log => {
-    // KST 기준으로 변환
-    const kstDate = toKSTDate(log.timestamp);
-    const dayIndex = kstDate.getDay(); // 0-6 (일-토)
+    // toKSTDate 함수를 사용하지 않고 직접 요일 추출
+    let dayIndex;
+    
+    if (typeof log.timestamp === 'string') {
+      // ISO 형식 문자열에서 날짜 직접 파싱
+      const parts = log.timestamp.split('T')[0].split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // 월은 0-11 범위
+        const day = parseInt(parts[2], 10);
+        
+        // 날짜 객체 생성 및 요일 추출
+        const date = new Date(year, month, day);
+        dayIndex = date.getDay(); // 0-6 (일-토)
+      } else {
+        // 파싱 실패 시 기본 Date 객체 사용
+        const date = new Date(log.timestamp);
+        dayIndex = date.getDay();
+      }
+    } else {
+      // Date 객체이거나 다른 형식일 경우
+      const date = new Date(log.timestamp);
+      dayIndex = date.getDay();
+    }
+    
+    // 요일 인덱스 범위 검증 (0-6)
+    dayIndex = Math.max(0, Math.min(6, dayIndex));
+    
+    // 해당 요일 카운트 증가
     submissionsByDay[dayIndex]++;
   });
   
@@ -215,11 +241,29 @@ export function getSubmissionsByTimeOfDay(logs) {
   const submissionsByTime = Array(24).fill(0);
   
   logs.forEach(log => {
-    // KST 기준으로 변환
-    const kstDate = toKSTDate(log.timestamp);
-    const hours = kstDate.getHours();
+    // toKSTDate 함수를 사용하지 않고 직접 시간 추출
+    let hours;
     
-    // hours는 0-23 범위이므로 그대로 인덱스로 사용
+    if (typeof log.timestamp === 'string') {
+      // ISO 형식 문자열에서 시간 직접 추출 (HH 부분)
+      const timeMatch = log.timestamp.match(/T(\d{2}):/);
+      if (timeMatch && timeMatch[1]) {
+        hours = parseInt(timeMatch[1], 10);
+      } else {
+        // 매칭 실패 시 기본값 사용
+        const date = new Date(log.timestamp);
+        hours = date.getHours();
+      }
+    } else {
+      // Date 객체이거나 다른 형식일 경우
+      const date = new Date(log.timestamp);
+      hours = date.getHours();
+    }
+    
+    // 시간 범위 검증 (0-23)
+    hours = Math.max(0, Math.min(23, hours));
+    
+    // 해당 시간대 카운트 증가
     submissionsByTime[hours]++;
   });
   
