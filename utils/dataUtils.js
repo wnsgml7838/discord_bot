@@ -205,24 +205,22 @@ export function getSubmissionsByDayOfWeek(logs) {
  * 시간대별 제출 횟수 계산
  */
 export function getSubmissionsByTimeOfDay(logs) {
-  const timeRanges = ['06-09', '09-12', '12-15', '15-18', '18-21', '21-24', '00-06'];
-  const submissionsByTime = Array(7).fill(0);
+  // 1시간 단위로 24시간 표시
+  const timeRanges = [
+    '00-01', '01-02', '02-03', '03-04', '04-05', '05-06', 
+    '06-07', '07-08', '08-09', '09-10', '10-11', '11-12',
+    '12-13', '13-14', '14-15', '15-16', '16-17', '17-18',
+    '18-19', '19-20', '20-21', '21-22', '22-23', '23-24'
+  ];
+  const submissionsByTime = Array(24).fill(0);
   
   logs.forEach(log => {
     // KST 기준으로 변환
     const kstDate = toKSTDate(log.timestamp);
     const hours = kstDate.getHours();
     
-    let timeIndex;
-    if (hours >= 6 && hours < 9) timeIndex = 0;
-    else if (hours >= 9 && hours < 12) timeIndex = 1;
-    else if (hours >= 12 && hours < 15) timeIndex = 2;
-    else if (hours >= 15 && hours < 18) timeIndex = 3;
-    else if (hours >= 18 && hours < 21) timeIndex = 4;
-    else if (hours >= 21 && hours < 24) timeIndex = 5;
-    else timeIndex = 6; // 00-06
-    
-    submissionsByTime[timeIndex]++;
+    // hours는 0-23 범위이므로 그대로 인덱스로 사용
+    submissionsByTime[hours]++;
   });
   
   return {
