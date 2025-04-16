@@ -651,6 +651,7 @@ export function getReminderEffectData(logs) {
   
   // 리마인더 도입 날짜 (2024-04-06)
   const reminderStartDate = '2024-04-06';
+  const reminderEndDate = '2024-04-05'; // 리마인더 이전 마지막 날짜
   
   console.log(`[리마인더 효과 분석] 리마인더 도입일: ${reminderStartDate}`);
   console.log(`[리마인더 효과 분석] 전체 로그 수: ${filteredLogs.length}개`);
@@ -662,20 +663,32 @@ export function getReminderEffectData(logs) {
   let beforeReminderLogs = [];
   let afterReminderLogs = [];
   
+  // 날짜별 제출 수 디버깅을 위한 객체
+  const countByDate = {};
+  
   filteredLogs.forEach(log => {
     // 날짜만 추출 (YYYY-MM-DD 형식)
     const date = log.timestamp.split('T')[0];
     
+    // 날짜별 카운트 증가
+    countByDate[date] = (countByDate[date] || 0) + 1;
+    
     // 리마인더 전/후 분류
-    if (date < reminderStartDate) {
+    if (date <= reminderEndDate) {
       beforeReminderLogs.push(log);
-    } else {
+    } else if (date >= reminderStartDate) {
       afterReminderLogs.push(log);
     }
   });
   
-  console.log(`[리마인더 효과 분석] 리마인더 전 로그 수: ${beforeReminderLogs.length}개`);
-  console.log(`[리마인더 효과 분석] 리마인더 후 로그 수: ${afterReminderLogs.length}개`);
+  // 날짜별 제출 수 로깅 (오름차순 정렬)
+  console.log('[리마인더 효과 분석] 날짜별 제출 수:');
+  Object.keys(countByDate).sort().forEach(date => {
+    console.log(`  ${date}: ${countByDate[date]}개`);
+  });
+  
+  console.log(`[리마인더 효과 분석] 리마인더 전 로그 수 (~ ${reminderEndDate}): ${beforeReminderLogs.length}개`);
+  console.log(`[리마인더 효과 분석] 리마인더 후 로그 수 (${reminderStartDate} ~): ${afterReminderLogs.length}개`);
   
   // 리마인더 전 22시 이후 제출 수 계산
   let beforeReminderLateCount = 0;
@@ -728,23 +741,6 @@ export function getReminderEffectData(logs) {
   
   const difference = parseFloat((afterLatePercentage - beforeLatePercentage).toFixed(1));
   console.log(`[리마인더 효과 분석] 차이: ${difference}%p`);
-  
-  // 데이터가 없는 경우 테스트 데이터 사용 (스크린샷의 값과 일치하도록)
-  if (beforeTotal === 0) {
-    console.log('[리마인더 효과 분석] 리마인더 전 데이터가 없어 테스트 데이터 사용');
-    return {
-      labels: ['리마인더 전', '리마인더 후'],
-      beforeReminder: 16.7,  // 스크린샷과 동일하게
-      afterReminder: 63.6,   // 계산된 값이나 스크린샷과 동일하게 조정
-      data: [16.7, 63.6],
-      beforeCount: 9,        // 테스트 값
-      beforeTotal: 54,       // 테스트 값
-      afterCount: 593,       // 테스트 값
-      afterTotal: 933,       // 테스트 값
-      difference: 46.9       // 스크린샷과 동일하게
-    };
-  }
-  
   console.log('========== 리마인더 효과 분석 종료 ==========');
   
   return {
