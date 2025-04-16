@@ -454,8 +454,8 @@ export function getTopStreakUsers(logs) {
  * 일일 참여율 계산
  */
 export function getDailyParticipationRate(logs, days = 14) {
+  // 오늘 날짜 (로컬 시간)
   const today = new Date();
-  const startDate = subDays(today, days - 1);
   
   // 봇 사용자 이름 목록 - 제외할 봇의 닉네임
   const botNames = ['codingtest_check_bot'];
@@ -476,11 +476,15 @@ export function getDailyParticipationRate(logs, days = 14) {
   
   if (totalUsers === 0) return { labels: [], data: [], average: 0 };
   
-  // 날짜별 제출 기록 초기화 (스터디 기준일 사용)
+  // 스터디 날짜 범위 계산 (현재로부터 days일 전까지)
+  const studyDates = [];
   const dailyParticipation = {};
+  
+  // 최근 days일의 날짜 문자열 생성 (오늘 포함)
   for (let i = 0; i < days; i++) {
     const date = subDays(today, i);
     const dateStr = format(date, 'yyyy-MM-dd');
+    studyDates.push(dateStr);
     dailyParticipation[dateStr] = new Set();
   }
   
@@ -492,18 +496,22 @@ export function getDailyParticipationRate(logs, days = 14) {
     // 스터디 기준일 적용 (당일 오전 2시 ~ 차일 오전 2시)
     const studyDate = getStudyDate(log.timestamp);
     
+    // 지정된 날짜 범위 내에 있는 경우만 집계
     if (dailyParticipation[studyDate]) {
       dailyParticipation[studyDate].add(log.nickname);
     }
   });
   
-  // 날짜 역순으로 정렬 (최신 날짜가 마지막)
-  const sortedDates = Object.keys(dailyParticipation).sort();
+  // 날짜 순서대로 정렬 (과거 -> 현재)
+  const sortedDates = studyDates.sort();
   
-  // 날짜별 참여율 계산 
+  // 날짜별 참여율 계산
   const participationData = sortedDates.map(date => {
     const participants = dailyParticipation[date].size;
+    const participantsList = [...dailyParticipation[date]].join(', ');
     console.log(`${date} 참여자 수: ${participants}명 / ${totalUsers}명 (${(participants/totalUsers*100).toFixed(1)}%)`);
+    console.log(`${date} 참여자 목록: ${participantsList}`);
+    
     const rate = totalUsers > 0 ? (participants / totalUsers * 100).toFixed(1) : 0;
     return parseFloat(rate);
   });
