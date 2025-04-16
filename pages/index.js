@@ -317,40 +317,29 @@ export default function Home() {
                 </div>
                 
                 {/* 리마인더 전후 22시 이후 제출 비율 비교 */}
-                <div className="card">
-                  <h3 className="text-base font-medium text-gray-300 mb-2">
-                    리마인더 효과 분석: 22시~01시 제출 비율
-                  </h3>
-                  <div className="w-full h-[230px]">
-                    <HeatmapChart 
-                      title=""
-                      data={statsData.reminderEffectData?.data || []}
-                      labels={statsData.reminderEffectData?.labels || []}
-                      colorGradient="purple"
-                      tooltipCallback={(value, context) => {
-                        const index = context.dataIndex;
-                        const isBeforeReminder = index === 0;
-                        const count = isBeforeReminder 
-                          ? statsData.reminderEffectData?.beforeCount 
-                          : statsData.reminderEffectData?.afterCount;
-                        const total = isBeforeReminder 
-                          ? statsData.reminderEffectData?.beforeTotal
-                          : statsData.reminderEffectData?.afterTotal;
-                        return `${value}% (${count}/${total})`;
-                      }}
-                    />
+                <div className="col-span-12 md:col-span-6 lg:col-span-6">
+                  <div className="card">
+                    <h3 className="card-title mb-2">리마인더 효과 (22시 이후 제출 비율)</h3>
+                    <div className="relative">
+                      <HeatmapChart
+                        data={statsData.reminderEffectData?.data || [0, 0]}
+                        labels={statsData.reminderEffectData?.labels || ['리마인더 전', '리마인더 후']}
+                        colorGradient="amber"
+                        tooltipCallback={(context) => `${context.dataset.data[context.dataIndex]}% 제출`}
+                      />
+                      <div className="mt-4 text-center text-sm text-gray-800">
+                        <p className="font-medium">
+                          리마인더 효과: 
+                          <span className={`ml-1 ${statsData.reminderEffectData?.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {statsData.reminderEffectData?.difference > 0 ? '+' : ''}{statsData.reminderEffectData?.difference || 0}%p 증가
+                          </span>
+                          <span className="block mt-1 text-xs text-gray-600">
+                            (전: {statsData.reminderEffectData?.beforeCount || 0}개, 후: {statsData.reminderEffectData?.afterCount || 0}개)
+                          </span>
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  {statsData.reminderEffectData?.afterReminder > statsData.reminderEffectData?.beforeReminder ? (
-                    <div className="mt-1 text-center text-sm text-gray-500 italic">
-                      리마인더 효과: +{(statsData.reminderEffectData?.afterReminder - statsData.reminderEffectData?.beforeReminder).toFixed(1)}%p 증가
-                      {statsData.reminderEffectData?.debug && ` (전: ${statsData.reminderEffectData.debug.beforeLogs}개, 후: ${statsData.reminderEffectData.debug.afterLogs}개)`}
-                    </div>
-                  ) : (
-                    <div className="mt-1 text-center text-sm text-gray-500 italic">
-                      리마인더 효과 없음: {(statsData.reminderEffectData?.beforeReminder - statsData.reminderEffectData?.afterReminder).toFixed(1)}%p 감소
-                      {statsData.reminderEffectData?.debug && ` (전: ${statsData.reminderEffectData.debug.beforeLogs}개, 후: ${statsData.reminderEffectData.debug.afterLogs}개)`}
-                    </div>
-                  )}
                 </div>
               </div>
             </section>

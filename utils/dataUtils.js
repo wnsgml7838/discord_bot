@@ -637,86 +637,108 @@ export function getReminderEffectData(logs) {
     return {
       labels: ['리마인더 전', '리마인더 후'],
       beforeReminder: 0,
-      afterReminder: 0
+      afterReminder: 0,
+      data: [0, 0],
+      beforeCount: 0,
+      beforeTotal: 0,
+      afterCount: 0,
+      afterTotal: 0
     };
   }
   
   // 리마인더 도입 날짜 (2024-04-06)
   const reminderStartDate = '2024-04-06';
   
+  console.log(`[리마인더 효과 분석] 리마인더 도입일: ${reminderStartDate}`);
+  
+  // 날짜별 제출 시간 분류 (22시 이전/이후)
+  const submissionsByDate = {};
+  
+  filteredLogs.forEach(log => {
+    const studyDate = getStudyDate(log.timestamp, log.kstTimestampStr || null);
+    
+    if (!submissionsByDate[studyDate]) {
+      submissionsByDate[studyDate] = {
+        early: [], // 22시 이전
+        late: []   // 22시 이후
+      };
+    }
+    
+    // KST 시간 확인
+    let kstHour;
+    if (log.kstTimestampStr) {
+      // kstTimestampStr 형식이 "2024-04-05 23:45:12" 형태라고 가정
+      const timeStr = log.kstTimestampStr.split(' ')[1];
+      kstHour = parseInt(timeStr.split(':')[0], 10);
+    } else {
+      // UTC 시간에서 KST 시간 계산
+      const date = new Date(log.timestamp);
+      kstHour = (date.getUTCHours() + 9) % 24;
+    }
+    
+    // 22시~01시 사이 제출 확인
+    const isLateSubmission = kstHour >= 22 || kstHour <= 1;
+    
+    if (isLateSubmission) {
+      submissionsByDate[studyDate].late.push(log.nickname);
+    } else {
+      submissionsByDate[studyDate].early.push(log.nickname);
+    }
+    
+    // 로깅 추가
+    console.log(`[리마인더 효과 분석] ${log.nickname} 제출: ${studyDate} ${kstHour}시 - ${isLateSubmission ? '늦은' : '이른'} 제출`);
+  });
+  
   // 리마인더 이전/이후 데이터 분리
-  const beforeReminderLogs = filteredLogs.filter(log => {
-    const studyDate = getStudyDate(log.timestamp, log.kstTimestampStr || null);
-    // 4월 6일 이전의 모든 데이터 사용 (특정 기간으로 제한하지 않음)
-    return isBeforeOrEqual(studyDate, '2024-04-05');
+  const beforeReminderDates = Object.keys(submissionsByDate).filter(
+    date => isBeforeOrEqual(date, '2024-04-05')
+  );
+  
+  const afterReminderDates = Object.keys(submissionsByDate).filter(
+    date => isAfterOrEqual(date, reminderStartDate)
+  );
+  
+  console.log(`[리마인더 효과 분석] 리마인더 전 날짜: ${beforeReminderDates.length}일, 리마인더 후 날짜: ${afterReminderDates.length}일`);
+  
+  // 리마인더 전 데이터 집계
+  let beforeEarlyTotal = 0;
+  let beforeLateTotal = 0;
+  
+  beforeReminderDates.forEach(date => {
+    beforeEarlyTotal += submissionsByDate[date].early.length;
+    beforeLateTotal += submissionsByDate[date].late.length;
   });
   
-  const afterReminderLogs = filteredLogs.filter(log => {
-    const studyDate = getStudyDate(log.timestamp, log.kstTimestampStr || null);
-    return isAfterOrEqual(studyDate, reminderStartDate);
+  const beforeTotal = beforeEarlyTotal + beforeLateTotal;
+  const beforeLatePercentage = beforeTotal === 0 ? 0 
+    : parseFloat(((beforeLateTotal / beforeTotal) * 100).toFixed(1));
+  
+  // 리마인더 후 데이터 집계
+  let afterEarlyTotal = 0;
+  let afterLateTotal = 0;
+  
+  afterReminderDates.forEach(date => {
+    afterEarlyTotal += submissionsByDate[date].early.length;
+    afterLateTotal += submissionsByDate[date].late.length;
   });
   
-  // 리마인더 전 22시 이후 제출 비율 계산
-  const beforeReminderCount = beforeReminderLogs.length;
-  const beforeReminderLateCount = beforeReminderLogs.filter(log => {
-    // KST 시간 확인
-    let kstHour;
-    if (log.kstTimestampStr) {
-      // kstTimestampStr 형식이 "2024-04-05 23:45:12" 형태라고 가정
-      const timeStr = log.kstTimestampStr.split(' ')[1];
-      kstHour = parseInt(timeStr.split(':')[0], 10);
-    } else {
-      // UTC 시간에서 KST 시간 계산
-      const date = new Date(log.timestamp);
-      kstHour = (date.getUTCHours() + 9) % 24;
-    }
-    // 22시~01시 사이 제출 확인
-    return kstHour >= 22 || kstHour <= 1;
-  }).length;
+  const afterTotal = afterEarlyTotal + afterLateTotal;
+  const afterLatePercentage = afterTotal === 0 ? 0 
+    : parseFloat(((afterLateTotal / afterTotal) * 100).toFixed(1));
   
-  // 리마인더 후 22시 이후 제출 비율 계산
-  const afterReminderCount = afterReminderLogs.length;
-  const afterReminderLateCount = afterReminderLogs.filter(log => {
-    // KST 시간 확인
-    let kstHour;
-    if (log.kstTimestampStr) {
-      // kstTimestampStr 형식이 "2024-04-05 23:45:12" 형태라고 가정
-      const timeStr = log.kstTimestampStr.split(' ')[1];
-      kstHour = parseInt(timeStr.split(':')[0], 10);
-    } else {
-      // UTC 시간에서 KST 시간 계산
-      const date = new Date(log.timestamp);
-      kstHour = (date.getUTCHours() + 9) % 24;
-    }
-    // 22시~01시 사이 제출 확인
-    return kstHour >= 22 || kstHour <= 1;
-  }).length;
+  console.log(`[리마인더 효과 분석] 리마인더 전: ${beforeLateTotal}/${beforeTotal} (${beforeLatePercentage}%)`);
+  console.log(`[리마인더 효과 분석] 리마인더 후: ${afterLateTotal}/${afterTotal} (${afterLatePercentage}%)`);
   
-  const beforeReminderPercentage = beforeReminderCount === 0 ? 0 
-    : parseFloat(((beforeReminderLateCount / beforeReminderCount) * 100).toFixed(1));
-  
-  const afterReminderPercentage = afterReminderCount === 0 ? 0 
-    : parseFloat(((afterReminderLateCount / afterReminderCount) * 100).toFixed(1));
-  
-  console.log('========== 리마인더 효과 분석 ==========');
-  console.log(`리마인더 전 데이터: ${beforeReminderCount}개, 22시 이후: ${beforeReminderLateCount}개, 비율: ${beforeReminderPercentage}%`);
-  console.log(`리마인더 후 데이터: ${afterReminderCount}개, 22시 이후: ${afterReminderLateCount}개, 비율: ${afterReminderPercentage}%`);
-  
-  // 데이터를 배열로 반환
   return {
     labels: ['리마인더 전', '리마인더 후'],
-    beforeReminder: beforeReminderPercentage,
-    afterReminder: afterReminderPercentage,
-    data: [beforeReminderPercentage, afterReminderPercentage],
-    beforeCount: beforeReminderLateCount,
-    beforeTotal: beforeReminderCount,
-    afterCount: afterReminderLateCount,
-    afterTotal: afterReminderCount,
-    // 디버깅 정보 추가
-    debug: {
-      beforeLogs: beforeReminderLogs.length,
-      afterLogs: afterReminderLogs.length
-    }
+    beforeReminder: beforeLatePercentage,
+    afterReminder: afterLatePercentage,
+    data: [beforeLatePercentage, afterLatePercentage],
+    beforeCount: beforeLateTotal,
+    beforeTotal: beforeTotal,
+    afterCount: afterLateTotal,
+    afterTotal: afterTotal,
+    difference: parseFloat((afterLatePercentage - beforeLatePercentage).toFixed(1))
   };
 }
 

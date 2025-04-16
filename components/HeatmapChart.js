@@ -75,6 +75,7 @@ const HeatmapChart = ({
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+    indexAxis: 'y',
     layout: {
       padding: 5,
     },
@@ -83,11 +84,6 @@ const HeatmapChart = ({
         grid: {
           display: false,
         },
-        min: 0,
-        suggestedMax: Math.max(...data) * 1.1,
-        ticks: {
-          precision: 0
-        }
       },
       y: {
         beginAtZero: true,
