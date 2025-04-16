@@ -188,17 +188,48 @@ export function getSubmissionsByDayOfWeek(logs) {
   
   logs.forEach(log => {
     try {
-      // 타임스탬프를 KST로 변환하여 요일 계산
-      const date = toKSTDate(log.timestamp);
-      const dayOfWeek = date.getDay(); // 0: 일요일, 6: 토요일
+      // ISO 형식의 타임스탬프에서 Date 객체 생성
+      const date = new Date(log.timestamp);
       
-      // 유효한 요일 인덱스인지 확인
-      if (dayOfWeek >= 0 && dayOfWeek <= 6) {
-        submissionsByDay[dayOfWeek]++;
+      // UTC 날짜와 시간 성분 추출
+      const utcYear = date.getUTCFullYear();
+      const utcMonth = date.getUTCMonth();
+      const utcDate = date.getUTCDate();
+      const utcHours = date.getUTCHours();
+      
+      // KST 시간 계산 (UTC+9)
+      // 시간이 15시(UTC) 이상이면 날짜가 변경됨
+      let kstDate = utcDate;
+      let kstMonth = utcMonth;
+      let kstYear = utcYear;
+      
+      if (utcHours + 9 >= 24) {
+        // 날짜가 바뀌는 경우
+        kstDate += 1;
+        
+        // 월말 처리
+        const lastDayOfMonth = new Date(utcYear, utcMonth + 1, 0).getDate();
+        if (kstDate > lastDayOfMonth) {
+          kstDate = 1;
+          kstMonth += 1;
+          
+          // 연말 처리
+          if (kstMonth > 11) {
+            kstMonth = 0;
+            kstYear += 1;
+          }
+        }
       }
+      
+      // KST 기준 날짜 객체 생성
+      const kstDateObj = new Date(kstYear, kstMonth, kstDate);
+      const dayOfWeek = kstDateObj.getDay(); // 0: 일요일, 6: 토요일
+      
+      // 요일별 카운트 증가
+      submissionsByDay[dayOfWeek]++;
     } catch (error) {
-      console.error('요일 계산 중 오류:', error);
-      // 오류 발생 시 현재 날짜의 요일 기준으로 카운트
+      console.error('요일 계산 중 오류:', error, log.timestamp);
+      // 오류 발생 시 현재 날짜의 요일 기준으로 카운트 (로컬 시간 기준)
       const today = new Date().getDay();
       submissionsByDay[today]++;
     }
