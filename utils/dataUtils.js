@@ -647,7 +647,8 @@ export function getReminderEffectData(logs) {
   // 리마인더 이전/이후 데이터 분리
   const beforeReminderLogs = filteredLogs.filter(log => {
     const studyDate = getStudyDate(log.timestamp, log.kstTimestampStr || null);
-    return isBeforeOrEqual(studyDate, '2024-04-05') && isAfterOrEqual(studyDate, '2024-04-03');
+    // 4월 6일 이전의 모든 데이터 사용 (특정 기간으로 제한하지 않음)
+    return isBeforeOrEqual(studyDate, '2024-04-05');
   });
   
   const afterReminderLogs = filteredLogs.filter(log => {

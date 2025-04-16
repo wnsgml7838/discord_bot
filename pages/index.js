@@ -240,80 +240,115 @@ export default function Home() {
               
               {/* 일일 참여율 차트 추가 */}
               <div className="mb-6">
-                <LineChart 
-                  title={`일일 참여율 (최근 14일) - 평균: ${statsData.participationRateData?.average || 0}%`}
-                  datasets={[{
-                    label: '참여율(%)',
-                    data: statsData.participationRateData?.data || [],
-                    borderColor: 'rgba(79, 70, 229, 1)',
-                    backgroundColor: 'rgba(79, 70, 229, 0.1)'
-                  }]}
-                  labels={statsData.participationRateData?.labels || []}
-                  yAxisLabel="%"
-                  suggestedMax={100}
-                  tooltipLabel="참여율"
-                  tooltipSuffix="%"
-                />
+                <div className="card">
+                  <h3 className="text-base font-medium text-gray-300 mb-2">
+                    일일 참여율 (최근 14일) - 평균: {statsData.participationRateData?.average || 0}%
+                  </h3>
+                  <div className="w-full h-[230px]">
+                    <LineChart 
+                      title=""
+                      datasets={[{
+                        label: '참여율(%)',
+                        data: statsData.participationRateData?.data || [],
+                        borderColor: 'rgba(79, 70, 229, 1)',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)'
+                      }]}
+                      labels={statsData.participationRateData?.labels || []}
+                      yAxisLabel="%"
+                      suggestedMax={100}
+                      tooltipLabel="참여율"
+                      tooltipSuffix="%"
+                    />
+                  </div>
+                </div>
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <HeatmapChart 
-                  title="요일별 제출 현황" 
-                  data={statsData.dayOfWeekData.data} 
-                  labels={statsData.dayOfWeekData.labels}
-                  colorGradient="blue"
-                />
-                <HeatmapChart 
-                  title="시간대별 제출 현황" 
-                  data={statsData.timeOfDayData.data} 
-                  labels={statsData.timeOfDayData.labels}
-                  colorGradient="green"
-                />
+                <div className="card">
+                  <h3 className="text-base font-medium text-gray-300 mb-2">
+                    요일별 제출 현황
+                  </h3>
+                  <div className="w-full h-[230px]">
+                    <HeatmapChart 
+                      title=""
+                      data={statsData.dayOfWeekData.data} 
+                      labels={statsData.dayOfWeekData.labels}
+                      colorGradient="blue"
+                    />
+                  </div>
+                </div>
+                <div className="card">
+                  <h3 className="text-base font-medium text-gray-300 mb-2">
+                    시간대별 제출 현황
+                  </h3>
+                  <div className="w-full h-[230px]">
+                    <HeatmapChart 
+                      title=""
+                      data={statsData.timeOfDayData.data} 
+                      labels={statsData.timeOfDayData.labels}
+                      colorGradient="green"
+                    />
+                  </div>
+                </div>
               </div>
               
               {/* 새로운 차트 배치: 미제출자 추이와 리마인더 효과를 한 행에 배치 */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                {/* 새로운 차트 1: 최근 3일간 미제출자 수 추이 */}
-                <div>
-                  <LineChart 
-                    title={`최근 3일간 미제출자 수 추이 - 평균: ${statsData.consecutiveNonSubmittersData?.average || 0}명`}
-                    datasets={[{
-                      label: '미제출자 수',
-                      data: statsData.consecutiveNonSubmittersData?.data || [],
-                      borderColor: 'rgba(239, 68, 68, 1)',
-                      backgroundColor: 'rgba(239, 68, 68, 0.1)'
-                    }]}
-                    labels={statsData.consecutiveNonSubmittersData?.labels || []}
-                    yAxisLabel="인원수"
-                    tooltipLabel="미제출자"
-                    tooltipSuffix="명"
-                  />
+                {/* 최근 3일간 미제출자 수 추이 */}
+                <div className="card">
+                  <h3 className="text-base font-medium text-gray-300 mb-2">
+                    최근 3일간 미제출자 수 추이 - 평균: {statsData.consecutiveNonSubmittersData?.average || 0}명
+                  </h3>
+                  <div className="w-full h-[230px]">
+                    <LineChart 
+                      title=""
+                      datasets={[{
+                        label: '미제출자 수',
+                        data: statsData.consecutiveNonSubmittersData?.data || [],
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)'
+                      }]}
+                      labels={statsData.consecutiveNonSubmittersData?.labels || []}
+                      yAxisLabel="인원수"
+                      tooltipLabel="미제출자"
+                      tooltipSuffix="명"
+                    />
+                  </div>
                 </div>
                 
-                {/* 새로운 차트 2: 리마인더 전후 22시 이후 제출 비율 비교 */}
-                <div>
-                  <HeatmapChart 
-                    title={`리마인더 효과 분석: 22시~01시 제출 비율`}
-                    data={statsData.reminderEffectData?.data || []}
-                    labels={statsData.reminderEffectData?.labels || []}
-                    colorGradient="purple"
-                    tooltipCallback={(value, context) => {
-                      const index = context.dataIndex;
-                      const isBeforeReminder = index === 0;
-                      const count = isBeforeReminder 
-                        ? statsData.reminderEffectData?.beforeCount 
-                        : statsData.reminderEffectData?.afterCount;
-                      const total = isBeforeReminder 
-                        ? statsData.reminderEffectData?.beforeTotal
-                        : statsData.reminderEffectData?.afterTotal;
-                      return `${value}% (${count}/${total})`;
-                    }}
-                    extraInfo={
-                      statsData.reminderEffectData?.afterReminder > statsData.reminderEffectData?.beforeReminder
-                        ? `리마인더 효과: +${(statsData.reminderEffectData?.afterReminder - statsData.reminderEffectData?.beforeReminder).toFixed(1)}%p 증가`
-                        : `리마인더 효과 없음: ${(statsData.reminderEffectData?.beforeReminder - statsData.reminderEffectData?.afterReminder).toFixed(1)}%p 감소`
-                    }
-                  />
+                {/* 리마인더 전후 22시 이후 제출 비율 비교 */}
+                <div className="card">
+                  <h3 className="text-base font-medium text-gray-300 mb-2">
+                    리마인더 효과 분석: 22시~01시 제출 비율
+                  </h3>
+                  <div className="w-full h-[230px]">
+                    <HeatmapChart 
+                      title=""
+                      data={statsData.reminderEffectData?.data || []}
+                      labels={statsData.reminderEffectData?.labels || []}
+                      colorGradient="purple"
+                      tooltipCallback={(value, context) => {
+                        const index = context.dataIndex;
+                        const isBeforeReminder = index === 0;
+                        const count = isBeforeReminder 
+                          ? statsData.reminderEffectData?.beforeCount 
+                          : statsData.reminderEffectData?.afterCount;
+                        const total = isBeforeReminder 
+                          ? statsData.reminderEffectData?.beforeTotal
+                          : statsData.reminderEffectData?.afterTotal;
+                        return `${value}% (${count}/${total})`;
+                      }}
+                    />
+                  </div>
+                  {statsData.reminderEffectData?.afterReminder > statsData.reminderEffectData?.beforeReminder ? (
+                    <div className="mt-1 text-center text-sm text-gray-500 italic">
+                      리마인더 효과: +{(statsData.reminderEffectData?.afterReminder - statsData.reminderEffectData?.beforeReminder).toFixed(1)}%p 증가
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-center text-sm text-gray-500 italic">
+                      리마인더 효과 없음: {(statsData.reminderEffectData?.beforeReminder - statsData.reminderEffectData?.afterReminder).toFixed(1)}%p 감소
+                    </div>
+                  )}
                 </div>
               </div>
             </section>

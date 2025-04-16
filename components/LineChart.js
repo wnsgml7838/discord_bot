@@ -71,49 +71,6 @@ const LineChart = ({
       mode: 'index',
       intersect: false,
     },
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          boxWidth: 10,
-          usePointStyle: true,
-          pointStyle: 'circle',
-          padding: 15,
-          color: 'rgba(203, 213, 225, 0.8)',
-        }
-      },
-      title: {
-        display: true,
-        text: title,
-        color: 'rgba(255, 255, 255, 0.8)',
-        font: {
-          size: 14,
-          weight: '500'
-        },
-        padding: {
-          bottom: 15
-        }
-      },
-      tooltip: {
-        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-        titleColor: 'rgba(255, 255, 255, 0.9)',
-        bodyColor: 'rgba(255, 255, 255, 0.9)',
-        borderColor: 'rgba(148, 163, 184, 0.2)',
-        borderWidth: 1,
-        padding: 10,
-        boxPadding: 5,
-        usePointStyle: true,
-        callbacks: {
-          label: function(context) {
-            if (tooltipLabel) {
-              const suffix = tooltipSuffix || '';
-              return `${tooltipLabel}: ${context.formattedValue}${suffix}`;
-            }
-            return `${context.dataset.label}: ${context.formattedValue}회 제출`;
-          }
-        }
-      }
-    },
     scales: {
       x: {
         grid: {
@@ -126,6 +83,10 @@ const LineChart = ({
       },
       y: {
         beginAtZero: true,
+        title: {
+          display: yAxisLabel ? true : false,
+          text: yAxisLabel || '',
+        },
         suggestedMax: suggestedMax,
         grid: {
           color: 'rgba(148, 163, 184, 0.1)',
@@ -139,7 +100,43 @@ const LineChart = ({
           }
         }
       }
-    }
+    },
+    plugins: {
+      tooltip: {
+        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+        titleColor: 'rgba(255, 255, 255, 0.9)',
+        bodyColor: 'rgba(255, 255, 255, 0.9)',
+        borderColor: 'rgba(148, 163, 184, 0.2)',
+        borderWidth: 1,
+        padding: 10,
+        boxPadding: 5,
+        usePointStyle: true,
+        callbacks: {
+          label: function(context) {
+            const label = tooltipLabel || context.dataset.label || '';
+            return `${label}: ${context.formattedValue}${tooltipSuffix || ''}`;
+          }
+        }
+      },
+      title: {
+        display: title ? true : false,
+        text: title,
+        color: 'rgba(255, 255, 255, 0.8)',
+        font: {
+          size: 14,
+          weight: '500'
+        },
+        padding: 20,
+      },
+      legend: {
+        position: 'top',
+        align: 'end',
+        labels: {
+          usePointStyle: true,
+          boxWidth: 6
+        }
+      },
+    },
   };
   
   return (
