@@ -271,47 +271,50 @@ export default function Home() {
                 />
               </div>
               
-              {/* 새로운 차트 1: 최근 3일간 미제출자 수 추이 */}
-              <div className="mb-6">
-                <LineChart 
-                  title={`최근 3일간 미제출자 수 추이 - 평균: ${statsData.consecutiveNonSubmittersData?.average || 0}명 (${statsData.consecutiveNonSubmittersData?.percentageAverage || 0}%)`}
-                  datasets={[{
-                    label: '미제출자 수',
-                    data: statsData.consecutiveNonSubmittersData?.data || [],
-                    borderColor: 'rgba(239, 68, 68, 1)',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)'
-                  }]}
-                  labels={statsData.consecutiveNonSubmittersData?.labels || []}
-                  yAxisLabel="인원수"
-                  tooltipLabel="미제출자"
-                  tooltipSuffix="명"
-                />
-              </div>
-              
-              {/* 새로운 차트 2: 리마인더 전후 22시 이후 제출 비율 비교 */}
-              <div className="mb-6">
-                <HeatmapChart 
-                  title={`리마인더 효과 분석: 22시~01시 사이 제출 비율 변화`}
-                  data={statsData.reminderEffectData?.data || []}
-                  labels={statsData.reminderEffectData?.labels || []}
-                  colorGradient="purple"
-                  tooltipCallback={(value, context) => {
-                    const index = context.dataIndex;
-                    const isBeforeReminder = index === 0;
-                    const count = isBeforeReminder 
-                      ? statsData.reminderEffectData?.beforeCount 
-                      : statsData.reminderEffectData?.afterCount;
-                    const total = isBeforeReminder 
-                      ? statsData.reminderEffectData?.beforeTotal
-                      : statsData.reminderEffectData?.afterTotal;
-                    return `${value}% (${count}/${total})`;
-                  }}
-                  extraInfo={
-                    statsData.reminderEffectData?.afterReminder > statsData.reminderEffectData?.beforeReminder
-                      ? `리마인더 효과: +${(statsData.reminderEffectData?.afterReminder - statsData.reminderEffectData?.beforeReminder).toFixed(1)}%p 증가`
-                      : `리마인더 효과 없음: ${(statsData.reminderEffectData?.beforeReminder - statsData.reminderEffectData?.afterReminder).toFixed(1)}%p 감소`
-                  }
-                />
+              {/* 새로운 차트 배치: 미제출자 추이와 리마인더 효과를 한 행에 배치 */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                {/* 새로운 차트 1: 최근 3일간 미제출자 수 추이 */}
+                <div>
+                  <LineChart 
+                    title={`최근 3일간 미제출자 수 추이 - 평균: ${statsData.consecutiveNonSubmittersData?.average || 0}명`}
+                    datasets={[{
+                      label: '미제출자 수',
+                      data: statsData.consecutiveNonSubmittersData?.data || [],
+                      borderColor: 'rgba(239, 68, 68, 1)',
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)'
+                    }]}
+                    labels={statsData.consecutiveNonSubmittersData?.labels || []}
+                    yAxisLabel="인원수"
+                    tooltipLabel="미제출자"
+                    tooltipSuffix="명"
+                  />
+                </div>
+                
+                {/* 새로운 차트 2: 리마인더 전후 22시 이후 제출 비율 비교 */}
+                <div>
+                  <HeatmapChart 
+                    title={`리마인더 효과 분석: 22시~01시 제출 비율`}
+                    data={statsData.reminderEffectData?.data || []}
+                    labels={statsData.reminderEffectData?.labels || []}
+                    colorGradient="purple"
+                    tooltipCallback={(value, context) => {
+                      const index = context.dataIndex;
+                      const isBeforeReminder = index === 0;
+                      const count = isBeforeReminder 
+                        ? statsData.reminderEffectData?.beforeCount 
+                        : statsData.reminderEffectData?.afterCount;
+                      const total = isBeforeReminder 
+                        ? statsData.reminderEffectData?.beforeTotal
+                        : statsData.reminderEffectData?.afterTotal;
+                      return `${value}% (${count}/${total})`;
+                    }}
+                    extraInfo={
+                      statsData.reminderEffectData?.afterReminder > statsData.reminderEffectData?.beforeReminder
+                        ? `리마인더 효과: +${(statsData.reminderEffectData?.afterReminder - statsData.reminderEffectData?.beforeReminder).toFixed(1)}%p 증가`
+                        : `리마인더 효과 없음: ${(statsData.reminderEffectData?.beforeReminder - statsData.reminderEffectData?.afterReminder).toFixed(1)}%p 감소`
+                    }
+                  />
+                </div>
               </div>
             </section>
             
