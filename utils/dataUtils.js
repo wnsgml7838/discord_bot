@@ -86,9 +86,38 @@ export function toKSTDate(timestamp) {
 /**
  * 스터디 기준일 계산 (당일 오전 2시 ~ 다음날 오전 2시)
  * @param {Date|string} timestamp - UTC 날짜 객체 또는 문자열
+ * @param {string|null} kstTimestampStr - KST 타임스탬프 문자열 (있으면 이것을 우선 사용)
  * @returns {string} 스터디 기준일 (YYYY-MM-DD)
  */
-function getStudyDate(timestamp) {
+function getStudyDate(timestamp, kstTimestampStr = null) {
+  // KST 타임스탬프가 있으면 그것을 우선 사용
+  if (kstTimestampStr) {
+    try {
+      // kstTimestampStr 형식: "2025-04-14 17:11:40"
+      const [datePart] = kstTimestampStr.split(' ');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hourPart] = kstTimestampStr.split(' ')[1].split(':');
+      const hour = parseInt(hourPart, 10);
+      
+      // KST 기준 오전 2시 이전이면 전날을 기준일로 설정
+      let studyDate;
+      if (hour < 2) {
+        // 전날 날짜 계산
+        const prevDate = new Date(year, month - 1, day);
+        prevDate.setDate(prevDate.getDate() - 1);
+        studyDate = prevDate.toISOString().split('T')[0];
+      } else {
+        studyDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+      
+      console.log(`[KST 변환] ${kstTimestampStr} -> 스터디일: ${studyDate} (KST ${hour}시)`);
+      return studyDate;
+    } catch (error) {
+      console.error(`KST 시간 변환 오류: ${error.message}. UTC 시간으로 대체합니다.`);
+      // 에러 발생 시 기존 UTC 변환 로직 사용
+    }
+  }
+  
   // ISO 형식의 타임스탬프에서 Date 객체 생성
   const date = new Date(timestamp);
   
@@ -133,7 +162,12 @@ function getStudyDate(timestamp) {
   // YYYY-MM-DD 형식의 문자열로 반환
   const monthStr = String(kstMonth + 1).padStart(2, '0');
   const dateStr = String(kstDate).padStart(2, '0');
-  return `${kstYear}-${monthStr}-${dateStr}`;
+  
+  // 디버깅 정보 출력 (모든 날짜에 대해)
+  const studyDate = `${kstYear}-${monthStr}-${dateStr}`;
+  console.log(`[UTC 변환] ${timestamp} -> 스터디일: ${studyDate} (KST ${kstHours}시)`);
+  
+  return studyDate;
 }
 
 /**
@@ -402,6 +436,8 @@ export function getTopStreakUsers(logs) {
  * 일일 참여율 계산
  */
 export function getDailyParticipationRate(logs, days = 14) {
+  console.log('========== 참여율 계산 시작 ==========');
+  
   // 봇 제외
   const botNames = ['codingtest_check_bot'];
   const filteredLogs = logs.filter(log => !botNames.includes(log.nickname));
@@ -409,18 +445,20 @@ export function getDailyParticipationRate(logs, days = 14) {
   // 실제 사용자 목록 (봇 제외)
   const allUsers = new Set(filteredLogs.map(log => log.nickname));
   
-  // 고정 사용자 수 사용 - YEARDREAM 5기 스터디 기준으로 31명으로 고정
-  const totalUsers = 31; // 항상 31명으로 고정
+  // 실제 사용자 수 사용 (고정값 31 대신)
+  const totalUsers = allUsers.size;
   
   console.log(`실제 사용자 수 (봇 제외): ${allUsers.size}`);
-  console.log(`계산에 사용하는 고정 사용자 수: ${totalUsers}명`);
+  console.log(`계산에 사용하는 사용자 수: ${totalUsers}명`);
+  console.log(`등록된 사용자 목록: ${[...allUsers].join(', ')}`);
   
   if (filteredLogs.length === 0) return { labels: [], data: [], average: 0 };
   
   // 1. 로그 데이터에서 모든 스터디 날짜 추출
   const studyDates = new Set();
   filteredLogs.forEach(log => {
-    const studyDate = getStudyDate(log.timestamp);
+    // KST 타임스탬프가 있으면 그것을 사용하여 스터디 기준일 계산
+    const studyDate = getStudyDate(log.timestamp, log.kstTimestampStr || null);
     studyDates.add(studyDate);
   });
   
@@ -430,12 +468,14 @@ export function getDailyParticipationRate(logs, days = 14) {
   // 3. 최근 days일만 유지
   const recentDates = sortedDates.slice(0, days);
   
+  console.log(`최근 ${days}일 날짜: ${recentDates.join(', ')}`);
+  
   // 4. 각 날짜별 참여자 계산
   const dateData = recentDates.map(date => {
     // 해당 날짜에 제출한 사용자들의 닉네임 집합
     const participants = new Set(
       filteredLogs
-        .filter(log => getStudyDate(log.timestamp) === date)
+        .filter(log => getStudyDate(log.timestamp, log.kstTimestampStr || null) === date)
         .map(log => log.nickname)
     );
     
@@ -445,8 +485,21 @@ export function getDailyParticipationRate(logs, days = 14) {
     // 날짜 라벨 포맷팅 (MM.dd)
     const displayDate = format(parseISO(date), 'MM.dd', { locale: ko });
     
-    console.log(`${date} (${displayDate}) 참여자 수: ${participants.size}명 / ${totalUsers}명 (${participationRate}%)`);
-    console.log(`${date} 참여자 목록: ${[...participants].join(', ')}`);
+    console.log(`\n[${date}] 참여자 수: ${participants.size}명 / ${totalUsers}명 (${participationRate}%)`);
+    console.log(`[${date}] 참여자 목록: ${[...participants].join(', ')}`);
+    
+    // 특정 날짜에 대해 상세 로그 표시
+    if (['2024-04-14', '2024-04-15'].includes(date)) {
+      console.log(`[${date}] 참여자 상세 정보:`, 
+        filteredLogs
+          .filter(log => getStudyDate(log.timestamp, log.kstTimestampStr || null) === date)
+          .map(log => ({
+            nickname: log.nickname, 
+            utc: log.timestamp,
+            kst: new Date(log.timestamp).toISOString().replace('Z', '+09:00')
+          }))
+      );
+    }
     
     return {
       date,
@@ -466,6 +519,9 @@ export function getDailyParticipationRate(logs, days = 14) {
   const average = data.length > 0 
     ? parseFloat((data.reduce((acc, val) => acc + val, 0) / data.length).toFixed(1))
     : 0;
+  
+  console.log(`\n평균 참여율: ${average}%`);
+  console.log('========== 참여율 계산 종료 ==========');
   
   return {
     labels,

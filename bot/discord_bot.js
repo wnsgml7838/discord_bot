@@ -162,6 +162,11 @@ async function fetchHistoricalData(targetChannelId, resetData = false) {
               const nickname = message.author.username;
               const timestamp = message.createdAt;
               const timestampStr = timestamp.toISOString().replace('T', ' ').substr(0, 19);
+              
+              // KST 타임스탬프 (UTC+9)
+              const kstTimestamp = new Date(timestamp.getTime() + 9 * 60 * 60 * 1000);
+              const kstTimestampStr = kstTimestamp.toISOString().replace('T', ' ').substr(0, 19);
+              
               const image_url = attachment.url;
               
               // 로그 데이터 추가
@@ -169,6 +174,7 @@ async function fetchHistoricalData(targetChannelId, resetData = false) {
                 nickname,
                 timestamp: timestamp.toISOString(),
                 timestampStr,
+                kstTimestampStr,  // KST 시간 추가
                 image_url,
                 messageId // 중복 방지를 위해 메시지 ID 저장
               };
@@ -176,7 +182,7 @@ async function fetchHistoricalData(targetChannelId, resetData = false) {
               logData.push(newLog);
               addedCount++;
               
-              console.log(`이전 이미지 데이터 추가: ${nickname}, ${timestampStr}`);
+              console.log(`이전 이미지 데이터 추가: ${nickname}, UTC: ${timestampStr}, KST: ${kstTimestampStr}`);
             }
           }
         }
@@ -215,12 +221,20 @@ client.on('messageCreate', async (message) => {
       if (attachment.contentType && attachment.contentType.startsWith("image/")) {
         const nickname = message.author.username;
         const timestamp = new Date();
-        const timestampStr = timestamp.toISOString().replace('T', ' ').substr(0, 19);
+        
+        // UTC 타임스탬프
+        const utcTimestampStr = timestamp.toISOString().replace('T', ' ').substr(0, 19);
+        
+        // KST 타임스탬프 (UTC+9)
+        const kstTimestamp = new Date(timestamp.getTime() + 9 * 60 * 60 * 1000);
+        const kstTimestampStr = kstTimestamp.toISOString().replace('T', ' ').substr(0, 19);
+        
         const image_url = attachment.url;
 
         // 터미널 출력
         console.log("👤 닉네임:", nickname);
-        console.log("🕒 전송 시간:", timestampStr);
+        console.log("🕒 전송 시간 (UTC):", utcTimestampStr);
+        console.log("🕒 전송 시간 (KST):", kstTimestampStr);
         console.log("🖼️ 이미지 URL:", image_url);
         console.log("-".repeat(50));
 
@@ -229,7 +243,8 @@ client.on('messageCreate', async (message) => {
           const newLog = {
             nickname,
             timestamp: timestamp.toISOString(),
-            timestampStr, 
+            timestampStr: utcTimestampStr, 
+            kstTimestampStr: kstTimestampStr,  // KST 시간 추가
             image_url,
             messageId: message.id // 메시지 ID 추가
           };
