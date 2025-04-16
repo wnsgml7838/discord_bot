@@ -85,22 +85,55 @@ export function toKSTDate(timestamp) {
 
 /**
  * 스터디 기준일 계산 (당일 오전 2시 ~ 다음날 오전 2시)
- * @param {Date|string} date - UTC 날짜 객체 또는 문자열
+ * @param {Date|string} timestamp - UTC 날짜 객체 또는 문자열
  * @returns {string} 스터디 기준일 (YYYY-MM-DD)
  */
-function getStudyDate(date) {
-  // 항상 KST로 변환
-  const kstDate = toKSTDate(date);
-  const hours = kstDate.getHours();
+function getStudyDate(timestamp) {
+  // ISO 형식의 타임스탬프에서 Date 객체 생성
+  const date = new Date(timestamp);
   
-  // KST 기준 오전 2시 이전이면 전날을 기준일로 설정
-  if (hours < 2) {
-    const prevDay = new Date(kstDate);
-    prevDay.setDate(prevDay.getDate() - 1);
-    return format(prevDay, 'yyyy-MM-dd');
+  // UTC 시간 기준으로 KST 시간 계산 (UTC+9)
+  let kstHours = (date.getUTCHours() + 9) % 24;
+  let kstDate = date.getUTCDate();
+  let kstMonth = date.getUTCMonth(); // 0-11 범위
+  let kstYear = date.getUTCFullYear();
+  
+  // UTC 기준으로 날짜 변경 처리
+  if (date.getUTCHours() + 9 >= 24) {
+    // 한국 시간으로 날짜가 바뀌는 경우
+    kstDate += 1;
+    
+    // 월말 처리
+    const lastDayOfMonth = new Date(Date.UTC(kstYear, kstMonth + 1, 0)).getUTCDate();
+    if (kstDate > lastDayOfMonth) {
+      kstDate = 1;
+      kstMonth += 1;
+      
+      // 연말 처리
+      if (kstMonth > 11) {
+        kstMonth = 0;
+        kstYear += 1;
+      }
+    }
   }
   
-  return format(kstDate, 'yyyy-MM-dd');
+  // KST 기준 오전 2시 이전이면 전날을 기준일로 설정
+  if (kstHours < 2) {
+    // 전날 날짜 계산
+    if (kstDate === 1) {
+      // 월초인 경우 전 월의 마지막 날로 설정
+      kstMonth = kstMonth === 0 ? 11 : kstMonth - 1;
+      kstYear = kstMonth === 11 ? kstYear - 1 : kstYear;
+      kstDate = new Date(Date.UTC(kstYear, kstMonth + 1, 0)).getUTCDate();
+    } else {
+      kstDate -= 1;
+    }
+  }
+  
+  // YYYY-MM-DD 형식의 문자열로 반환
+  const monthStr = String(kstMonth + 1).padStart(2, '0');
+  const dateStr = String(kstDate).padStart(2, '0');
+  return `${kstYear}-${monthStr}-${dateStr}`;
 }
 
 /**
@@ -208,10 +241,19 @@ export function getSubmissionsByHour(logs) {
 
   // 각 로그 항목을 시간대별로 집계
   logs.forEach(log => {
-    const timestamp = log.timestamp;
-    // KST 시간으로 변환하여 시간(hour) 추출
-    const hour = toKSTDate(timestamp).getHours();
-    submissionsByHour[hour]++;
+    try {
+      // ISO 타임스탬프에서 직접 Date 객체 생성
+      const date = new Date(log.timestamp);
+      
+      // UTC 시간에서 KST 시간 계산 (UTC+9)
+      // JavaScript getUTCHours()는 0-23 범위의 UTC 시간을 반환
+      let kstHour = (date.getUTCHours() + 9) % 24;
+      
+      // 시간대별 카운트 증가
+      submissionsByHour[kstHour]++;
+    } catch (error) {
+      console.error('시간대 계산 중 오류:', error, log.timestamp);
+    }
   });
 
   // 시간대 레이블 생성 (00시, 01시, ... 23시)
@@ -360,79 +402,74 @@ export function getTopStreakUsers(logs) {
  * 일일 참여율 계산
  */
 export function getDailyParticipationRate(logs, days = 14) {
-  // 오늘 날짜 (로컬 시간)
-  const today = new Date();
-  
-  // 봇 사용자 이름 목록 - 제외할 봇의 닉네임
+  // 봇 제외
   const botNames = ['codingtest_check_bot'];
+  const filteredLogs = logs.filter(log => !botNames.includes(log.nickname));
   
-  // 모든 사용자 목록에서 봇 제외
-  const allUsers = new Set(
-    logs
-      .map(log => log.nickname)
-      .filter(nickname => !botNames.includes(nickname))
-  );
+  // 실제 사용자 목록 (봇 제외)
+  const allUsers = new Set(filteredLogs.map(log => log.nickname));
   
-  // 실제 사용자 수 (봇 제외)
-  // const totalUsers = allUsers.size; // 동적으로 계산
-  const totalUsers = 31; // 고정 사용자 수 (YEARDREAM 5기 스터디 기준)
+  // 고정 사용자 수 사용 - YEARDREAM 5기 스터디 기준으로 31명으로 고정
+  const totalUsers = 31; // 항상 31명으로 고정
   
-  // 디버깅을 위해 사용자 정보 로깅
-  console.log(`필터링 후 사용자 수: ${allUsers.size}`);
-  console.log(`계산에 사용할 총 사용자 수: ${totalUsers}`);
+  console.log(`실제 사용자 수 (봇 제외): ${allUsers.size}`);
+  console.log(`계산에 사용하는 고정 사용자 수: ${totalUsers}명`);
   
-  if (totalUsers === 0) return { labels: [], data: [], average: 0 };
+  if (filteredLogs.length === 0) return { labels: [], data: [], average: 0 };
   
-  // 날짜 범위를 생성하고 초기화 (과거 -> 현재 순서)
-  const dateData = [];
-  
-  // 과거부터 현재까지의 날짜 범위 생성 (days-1일 전부터 오늘까지)
-  for (let i = days - 1; i >= 0; i--) {
-    const date = subDays(today, i);
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const displayDate = format(date, 'MM.dd', { locale: ko });
-    
-    dateData.push({
-      date: dateStr,
-      displayDate: displayDate,
-      participants: new Set()
-    });
-  }
-  
-  // 로그 데이터 분석하여 날짜별 제출자 집계 (스터디 기준일 사용)
-  logs.forEach(log => {
-    // 봇 제외
-    if (botNames.includes(log.nickname)) return;
-    
-    // 스터디 기준일 적용 (당일 오전 2시 ~ 차일 오전 2시)
+  // 1. 로그 데이터에서 모든 스터디 날짜 추출
+  const studyDates = new Set();
+  filteredLogs.forEach(log => {
     const studyDate = getStudyDate(log.timestamp);
+    studyDates.add(studyDate);
+  });
+  
+  // 2. 날짜 정렬 (최신순)
+  const sortedDates = [...studyDates].sort().reverse();
+  
+  // 3. 최근 days일만 유지
+  const recentDates = sortedDates.slice(0, days);
+  
+  // 4. 각 날짜별 참여자 계산
+  const dateData = recentDates.map(date => {
+    // 해당 날짜에 제출한 사용자들의 닉네임 집합
+    const participants = new Set(
+      filteredLogs
+        .filter(log => getStudyDate(log.timestamp) === date)
+        .map(log => log.nickname)
+    );
     
-    // 해당 날짜를 찾아서 참여자 추가
-    const dateEntry = dateData.find(entry => entry.date === studyDate);
-    if (dateEntry) {
-      dateEntry.participants.add(log.nickname);
-    }
+    // 참여율 계산 (항상 31명으로 나누기)
+    const participationRate = parseFloat(((participants.size / totalUsers) * 100).toFixed(1));
+    
+    // 날짜 라벨 포맷팅 (MM.dd)
+    const displayDate = format(parseISO(date), 'MM.dd', { locale: ko });
+    
+    console.log(`${date} (${displayDate}) 참여자 수: ${participants.size}명 / ${totalUsers}명 (${participationRate}%)`);
+    console.log(`${date} 참여자 목록: ${[...participants].join(', ')}`);
+    
+    return {
+      date,
+      displayDate,
+      participationRate
+    };
   });
   
-  // 각 날짜의 참여율 계산
-  dateData.forEach(entry => {
-    const participants = entry.participants.size;
-    console.log(`${entry.date} (${entry.displayDate}) 참여자 수: ${participants}명 / ${totalUsers}명 (${(participants/totalUsers*100).toFixed(1)}%)`);
-    entry.rate = parseFloat((participants / totalUsers * 100).toFixed(1));
-  });
+  // 5. 날짜순으로 다시 정렬 (과거 -> 현재)
+  dateData.reverse();
   
-  // 라벨과 데이터 분리
-  const labels = dateData.map(entry => entry.displayDate);
-  const data = dateData.map(entry => entry.rate);
+  // 6. 라벨과 데이터 추출
+  const labels = dateData.map(item => item.displayDate);
+  const data = dateData.map(item => item.participationRate);
   
-  // 평균 참여율 계산
+  // 7. 평균 참여율 계산
   const average = data.length > 0 
-    ? (data.reduce((acc, val) => acc + val, 0) / data.length).toFixed(1) 
+    ? parseFloat((data.reduce((acc, val) => acc + val, 0) / data.length).toFixed(1))
     : 0;
   
   return {
     labels,
     data,
-    average: parseFloat(average)
+    average
   };
 } 
