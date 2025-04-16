@@ -656,43 +656,25 @@ export function getReminderEffectData(logs) {
   console.log(`[리마인더 효과 분석] 리마인더 도입일: ${reminderStartDate}`);
   console.log(`[리마인더 효과 분석] 전체 로그 수: ${filteredLogs.length}개`);
   
-  // 파이썬 코드와 동일한 로직으로 구현
-  // 1. 각 로그 엔트리를 리마인더 전/후로 분류
-  // 2. 22시 이후 제출 여부 확인 (파이썬 코드는 단순히 hour >= 22 조건만 사용)
+  // 날짜별 제출자 데이터 구조화
+  const submissionsByDate = {};
   
-  let beforeReminderLogs = [];
-  let afterReminderLogs = [];
-  
-  // 날짜별 제출 수 디버깅을 위한 객체
-  const countByDate = {};
-  
+  // 모든 로그를 순회하며 날짜별 제출자 맵 생성
   filteredLogs.forEach(log => {
     // 날짜만 추출 (YYYY-MM-DD 형식)
     const date = log.timestamp.split('T')[0];
     
-    // 날짜별 카운트 증가
-    countByDate[date] = (countByDate[date] || 0) + 1;
-    
-    // 리마인더 전/후 분류
-    if (date <= reminderEndDate) {
-      beforeReminderLogs.push(log);
-    } else if (date >= reminderStartDate) {
-      afterReminderLogs.push(log);
+    // 해당 날짜의 데이터 없으면 초기화
+    if (!submissionsByDate[date]) {
+      submissionsByDate[date] = {
+        allUsers: new Set(),       // 그날 전체 인증한 사용자 (중복 제외)
+        lateUsers: new Set()       // 그날 22시 이후 인증한 사용자 (중복 제외)
+      };
     }
-  });
-  
-  // 날짜별 제출 수 로깅 (오름차순 정렬)
-  console.log('[리마인더 효과 분석] 날짜별 제출 수:');
-  Object.keys(countByDate).sort().forEach(date => {
-    console.log(`  ${date}: ${countByDate[date]}개`);
-  });
-  
-  console.log(`[리마인더 효과 분석] 리마인더 전 로그 수 (~ ${reminderEndDate}): ${beforeReminderLogs.length}개`);
-  console.log(`[리마인더 효과 분석] 리마인더 후 로그 수 (${reminderStartDate} ~): ${afterReminderLogs.length}개`);
-  
-  // 리마인더 전 22시 이후 제출 수 계산
-  let beforeReminderLateCount = 0;
-  beforeReminderLogs.forEach(log => {
+    
+    // 사용자 닉네임 추가
+    submissionsByDate[date].allUsers.add(log.nickname);
+    
     // KST 시간 확인
     let kstHour;
     if (log.kstTimestampStr) {
@@ -703,55 +685,110 @@ export function getReminderEffectData(logs) {
       kstHour = (date.getUTCHours() + 9) % 24;
     }
     
-    // 파이썬 코드와 동일하게 22시 이후만 체크
+    // 22시 이후 인증한 사용자 추가
     if (kstHour >= 22) {
-      beforeReminderLateCount++;
+      submissionsByDate[date].lateUsers.add(log.nickname);
     }
   });
   
-  // 리마인더 후 22시 이후 제출 수 계산
-  let afterReminderLateCount = 0;
-  afterReminderLogs.forEach(log => {
-    // KST 시간 확인
-    let kstHour;
-    if (log.kstTimestampStr) {
-      const timeStr = log.kstTimestampStr.split(' ')[1];
-      kstHour = parseInt(timeStr.split(':')[0], 10);
-    } else {
-      const date = new Date(log.timestamp);
-      kstHour = (date.getUTCHours() + 9) % 24;
-    }
+  // 날짜별 인증 현황 로깅
+  console.log('[리마인더 효과 분석] 날짜별 인증 현황:');
+  Object.keys(submissionsByDate).sort().forEach(date => {
+    const dayData = submissionsByDate[date];
+    const totalUsers = dayData.allUsers.size;
+    const lateUsers = dayData.lateUsers.size;
+    const lateRatio = totalUsers > 0 ? ((lateUsers / totalUsers) * 100).toFixed(1) : '0.0';
     
-    // 파이썬 코드와 동일하게 22시 이후만 체크
-    if (kstHour >= 22) {
-      afterReminderLateCount++;
+    console.log(`  ${date}: 전체 ${totalUsers}명, 22시 이후 ${lateUsers}명 (${lateRatio}%)`);
+  });
+  
+  // 리마인더 전/후 날짜 구분
+  const beforeDates = Object.keys(submissionsByDate).filter(date => date <= reminderEndDate);
+  const afterDates = Object.keys(submissionsByDate).filter(date => date >= reminderStartDate);
+  
+  console.log(`[리마인더 효과 분석] 리마인더 전 날짜 수: ${beforeDates.length}일`);
+  console.log(`[리마인더 효과 분석] 리마인더 후 날짜 수: ${afterDates.length}일`);
+  
+  // 리마인더 전/후 22시 이후 인증 비율 계산
+  let beforeTotalUsers = 0;    // 리마인더 전 총 인증 인원 수 (날짜별 합산)
+  let beforeLateUsers = 0;     // 리마인더 전 22시 이후 인증 인원 수 (날짜별 합산)
+  let beforeDailyRatios = [];  // 리마인더 전 날짜별 22시 이후 인증 비율
+  
+  beforeDates.forEach(date => {
+    const dayData = submissionsByDate[date];
+    const dayTotalUsers = dayData.allUsers.size;
+    const dayLateUsers = dayData.lateUsers.size;
+    
+    beforeTotalUsers += dayTotalUsers;
+    beforeLateUsers += dayLateUsers;
+    
+    // 날짜별 비율 추가 (인증자가 있는 날만)
+    if (dayTotalUsers > 0) {
+      beforeDailyRatios.push((dayLateUsers / dayTotalUsers) * 100);
     }
   });
   
-  const beforeTotal = beforeReminderLogs.length;
-  const beforeLatePercentage = beforeTotal === 0 ? 0 
-    : parseFloat(((beforeReminderLateCount / beforeTotal) * 100).toFixed(1));
+  let afterTotalUsers = 0;     // 리마인더 후 총 인증 인원 수 (날짜별 합산)
+  let afterLateUsers = 0;      // 리마인더 후 22시 이후 인증 인원 수 (날짜별 합산)
+  let afterDailyRatios = [];   // 리마인더 후 날짜별 22시 이후 인증 비율
   
-  const afterTotal = afterReminderLogs.length;
-  const afterLatePercentage = afterTotal === 0 ? 0 
-    : parseFloat(((afterReminderLateCount / afterTotal) * 100).toFixed(1));
+  afterDates.forEach(date => {
+    const dayData = submissionsByDate[date];
+    const dayTotalUsers = dayData.allUsers.size;
+    const dayLateUsers = dayData.lateUsers.size;
+    
+    afterTotalUsers += dayTotalUsers;
+    afterLateUsers += dayLateUsers;
+    
+    // 날짜별 비율 추가 (인증자가 있는 날만)
+    if (dayTotalUsers > 0) {
+      afterDailyRatios.push((dayLateUsers / dayTotalUsers) * 100);
+    }
+  });
   
-  console.log(`[리마인더 효과 분석] 리마인더 전 22시 이후 제출: ${beforeReminderLateCount}/${beforeTotal} (${beforeLatePercentage}%)`);
-  console.log(`[리마인더 효과 분석] 리마인더 후 22시 이후 제출: ${afterReminderLateCount}/${afterTotal} (${afterLatePercentage}%)`);
+  // 날짜별 평균 비율 계산
+  const beforeAverageRatio = beforeDailyRatios.length > 0 
+    ? parseFloat((beforeDailyRatios.reduce((a, b) => a + b, 0) / beforeDailyRatios.length).toFixed(1))
+    : 0;
   
-  const difference = parseFloat((afterLatePercentage - beforeLatePercentage).toFixed(1));
-  console.log(`[리마인더 효과 분석] 차이: ${difference}%p`);
+  const afterAverageRatio = afterDailyRatios.length > 0
+    ? parseFloat((afterDailyRatios.reduce((a, b) => a + b, 0) / afterDailyRatios.length).toFixed(1))
+    : 0;
+  
+  // 전체 비율 계산 (대안적 지표)
+  const beforeTotalRatio = beforeTotalUsers > 0
+    ? parseFloat(((beforeLateUsers / beforeTotalUsers) * 100).toFixed(1))
+    : 0;
+  
+  const afterTotalRatio = afterTotalUsers > 0
+    ? parseFloat(((afterLateUsers / afterTotalUsers) * 100).toFixed(1))
+    : 0;
+  
+  console.log(`[리마인더 효과 분석] 리마인더 전: 총 ${beforeTotalUsers}명 중 ${beforeLateUsers}명 22시 이후 인증`);
+  console.log(`[리마인더 효과 분석] 리마인더 전: 날짜별 평균 비율 ${beforeAverageRatio}%, 전체 평균 비율 ${beforeTotalRatio}%`);
+  console.log(`[리마인더 효과 분석] 리마인더 후: 총 ${afterTotalUsers}명 중 ${afterLateUsers}명 22시 이후 인증`);
+  console.log(`[리마인더 효과 분석] 리마인더 후: 날짜별 평균 비율 ${afterAverageRatio}%, 전체 평균 비율 ${afterTotalRatio}%`);
+  
+  // 날짜별 평균 비율 기준 차이
+  const averageDifference = parseFloat((afterAverageRatio - beforeAverageRatio).toFixed(1));
+  console.log(`[리마인더 효과 분석] 날짜별 평균 비율 차이: ${averageDifference}%p`);
+  
+  // 전체 비율 기준 차이
+  const totalDifference = parseFloat((afterTotalRatio - beforeTotalRatio).toFixed(1));
+  console.log(`[리마인더 효과 분석] 전체 비율 차이: ${totalDifference}%p`);
+  
   console.log('========== 리마인더 효과 분석 종료 ==========');
   
+  // 날짜별 평균 비율 기준으로 결과 반환
   return {
     labels: ['리마인더 전', '리마인더 후'],
-    beforeReminder: beforeLatePercentage,
-    afterReminder: afterLatePercentage,
-    data: [beforeLatePercentage, afterLatePercentage],
-    beforeCount: beforeReminderLateCount,
-    beforeTotal: beforeTotal,
-    afterCount: afterReminderLateCount,
-    afterTotal: afterTotal,
-    difference: difference
+    beforeReminder: beforeAverageRatio,
+    afterReminder: afterAverageRatio,
+    data: [beforeAverageRatio, afterAverageRatio],
+    beforeCount: beforeLateUsers,
+    beforeTotal: beforeTotalUsers,
+    afterCount: afterLateUsers,
+    afterTotal: afterTotalUsers,
+    difference: averageDifference
   };
 } 
