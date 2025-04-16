@@ -10,7 +10,7 @@ import Link from 'next/link';
 // 데이터 처리 유틸리티 함수 임포트
 import {
   getTotalSubmissions, getAverageSubmissionsPerUser, getMaxStreak,
-  getTopSubmitter, getSubmissionsByDayOfWeek, getSubmissionsByTimeOfDay,
+  getTopSubmitter, getSubmissionsByDayOfWeek, getSubmissionsByHour,
   getTop5Users, getRecentNonSubmitters, getRecentSubmissions,
   getTrendingUsers, getInactiveUsers, getTopStreakUsers,
   getDailyParticipationRate
@@ -81,7 +81,7 @@ export default function Home() {
     
     // 중간 영역 차트 데이터
     const dayOfWeekData = getSubmissionsByDayOfWeek(logs);
-    const timeOfDayData = getSubmissionsByTimeOfDay(logs);
+    const timeOfDayData = getSubmissionsByHour(logs);
     
     // 일일 참여율 데이터 추가
     const participationRateData = getDailyParticipationRate(logs, 14);
