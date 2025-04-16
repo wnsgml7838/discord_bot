@@ -656,6 +656,19 @@ export function getReminderEffectData(logs) {
   console.log(`[리마인더 효과 분석] 리마인더 도입일: ${reminderStartDate}`);
   console.log(`[리마인더 효과 분석] 전체 로그 수: ${filteredLogs.length}개`);
   
+  // 전체 로그 날짜 범위 확인 (디버깅용)
+  const allDates = new Set(filteredLogs.map(log => log.timestamp.split('T')[0]));
+  console.log(`[리마인더 효과 분석] 로그 날짜 범위: ${Math.min(...[...allDates].map(d => new Date(d).getTime()))} ~ ${Math.max(...[...allDates].map(d => new Date(d).getTime()))}`);
+  console.log(`[리마인더 효과 분석] 전체 날짜: ${[...allDates].sort().join(', ')}`);
+  
+  // 가장 오래된 날짜와 최신 날짜 확인
+  const sortedDates = [...allDates].sort();
+  console.log(`[리마인더 효과 분석] 가장 오래된 날짜: ${sortedDates[0]}, 최신 날짜: ${sortedDates[sortedDates.length - 1]}`);
+  
+  // 리마인더 전 날짜만 확인
+  const beforeReminderDates = sortedDates.filter(date => date <= reminderEndDate);
+  console.log(`[리마인더 효과 분석] 리마인더 전 날짜들: ${beforeReminderDates.join(', ')}`);
+  
   // 날짜별 제출자 데이터 구조화
   const submissionsByDate = {};
   
