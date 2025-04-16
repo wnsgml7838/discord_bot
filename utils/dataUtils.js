@@ -649,9 +649,9 @@ export function getReminderEffectData(logs) {
   
   console.log('========== 리마인더 효과 분석 시작 ==========');
   
-  // 리마인더 도입 날짜 (2024-04-06)
-  const reminderStartDate = '2024-04-06';
-  const reminderEndDate = '2024-04-05'; // 리마인더 이전 마지막 날짜
+  // 리마인더 도입 날짜 (2025-04-06) - 로그 데이터가 2025년으로 기록되어 있음
+  const reminderStartDate = '2025-04-06';
+  const reminderEndDate = '2025-04-05'; // 리마인더 이전 마지막 날짜
   
   console.log(`[리마인더 효과 분석] 리마인더 도입일: ${reminderStartDate}`);
   console.log(`[리마인더 효과 분석] 전체 로그 수: ${filteredLogs.length}개`);
