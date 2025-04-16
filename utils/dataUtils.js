@@ -457,9 +457,22 @@ export function getDailyParticipationRate(logs, days = 14) {
   const today = new Date();
   const startDate = subDays(today, days - 1);
   
-  // 모든 사용자 목록
-  const allUsers = new Set(logs.map(log => log.nickname));
+  // 봇 사용자 이름 목록 - 제외할 봇의 닉네임
+  const botNames = ['codingtest_check_bot'];
+  
+  // 모든 사용자 목록에서 봇 제외
+  const allUsers = new Set(
+    logs
+      .map(log => log.nickname)
+      .filter(nickname => !botNames.includes(nickname))
+  );
+  
+  // 실제 사용자 수 (봇 제외)
   const totalUsers = allUsers.size;
+  
+  // 디버깅을 위해 사용자 정보 로깅
+  console.log(`전체 사용자 수 (봇 제외): ${totalUsers}`);
+  console.log(`모든 사용자 목록:`, [...allUsers]);
   
   if (totalUsers === 0) return { labels: [], data: [], average: 0 };
   
@@ -473,6 +486,9 @@ export function getDailyParticipationRate(logs, days = 14) {
   
   // 로그 데이터 분석하여 날짜별 제출자 집계 (스터디 기준일 사용)
   logs.forEach(log => {
+    // 봇 제외
+    if (botNames.includes(log.nickname)) return;
+    
     // 스터디 기준일 적용 (당일 오전 2시 ~ 차일 오전 2시)
     const studyDate = getStudyDate(log.timestamp);
     
@@ -487,6 +503,7 @@ export function getDailyParticipationRate(logs, days = 14) {
   // 날짜별 참여율 계산 
   const participationData = sortedDates.map(date => {
     const participants = dailyParticipation[date].size;
+    console.log(`${date} 참여자 수: ${participants}명 / ${totalUsers}명 (${(participants/totalUsers*100).toFixed(1)}%)`);
     const rate = totalUsers > 0 ? (participants / totalUsers * 100).toFixed(1) : 0;
     return parseFloat(rate);
   });
