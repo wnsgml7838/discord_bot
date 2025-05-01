@@ -12,7 +12,24 @@ DISCORD_TOKEN=your_discord_token_here
 GITHUB_TOKEN=your_github_token_here
 GITHUB_OWNER=your_github_username
 GITHUB_REPO=your_repository_name
+DISCORD_WEBHOOK_URL=your_discord_webhook_url_here
+API_CRON_SECRET=your_api_cron_secret_here
 ```
+
+## Discord Webhook URL 설정 방법
+
+1. Discord 서버 관리자 패널에서 "웹후크" 메뉴로 이동합니다.
+2. "새 웹후크" 버튼을 클릭합니다.
+3. 웹후크 이름과 채널을 설정합니다.
+4. "웹후크 URL 복사" 버튼을 클릭하여 URL을 복사합니다.
+5. 이 URL을 `.env` 파일의 `DISCORD_WEBHOOK_URL`에 붙여넣습니다.
+
+## Vercel 배포 시 추가 환경 변수 설정
+
+Vercel에 배포할 때 다음 환경 변수를 추가로 설정하세요:
+
+- `DISCORD_WEBHOOK_URL`: Discord에 로그를 전송하기 위한 웹후크 URL
+- `API_CRON_SECRET`: 크론 작업에 대한 인증을 위한 비밀 키 (임의의 복잡한 문자열 설정)
 
 ## 설치 및 실행
 

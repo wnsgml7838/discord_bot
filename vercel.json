@@ -11,5 +11,11 @@
       "src": "/(.*)",
       "dest": "/$1"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron-logger",
+      "schedule": "0 */1 * * *"
+    }
   ]
 } 

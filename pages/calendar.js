@@ -7,6 +7,7 @@ import { format, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import Layout from '../components/Layout';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export default function CalendarPage() {
   const [logs, setLogs] = useState([]);
@@ -365,7 +366,23 @@ export default function CalendarPage() {
         <title>인증 캘린더 - 코딩 스터디</title>
       </Head>
       
-      <h1 className="text-2xl font-bold mb-6">📅 인증 캘린더</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">스터디 캘린더</h1>
+        <div className="flex space-x-4">
+          <Link href="/recommend" className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            <span>문제 추천</span>
+          </Link>
+          <Link href="/" className="inline-flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            <span>대시보드</span>
+          </Link>
+        </div>
+      </div>
       
       <div className="flex flex-col lg:flex-row gap-6">
         {/* 왼쪽 캘린더 영역 */}

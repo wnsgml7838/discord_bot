@@ -9,16 +9,17 @@ const path = require('path');
 /**
  * 백준 아이디로 문제 추천 
  * @param {string} handle - 백준 아이디
+ * @param {string} mode - 추천 모드 (all, recent, weakness, tier, similar, beginner)
  * @returns {Promise<string>} - 추천 결과 메시지
  */
-function recommendBaekjoonProblems(handle) {
+function recommendBaekjoonProblems(handle, mode = 'all') {
   return new Promise((resolve, reject) => {
     const scriptPath = path.join(__dirname, 'commands', 'baekjoon_recommender.py');
     
-    console.log(`백준 문제 추천 시작: ${handle}`);
-    console.log(`실행 경로: python ${scriptPath} ${handle}`);
+    console.log(`백준 문제 추천 시작: ${handle}, 모드: ${mode}`);
+    console.log(`실행 경로: python ${scriptPath} ${handle} ${mode}`);
     
-    exec(`python ${scriptPath} ${handle}`, (error, stdout, stderr) => {
+    exec(`python ${scriptPath} ${handle} ${mode}`, (error, stdout, stderr) => {
       if (error) {
         console.error('백준 문제 추천 오류:', error.message);
         console.error('STDERR:', stderr);

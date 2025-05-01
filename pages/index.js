@@ -6,6 +6,8 @@ import {
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import Link from 'next/link';
+import LoggedLink from '../components/LoggedLink';
+import { logUserActivity } from '../utils/activityLogger';
 
 // 데이터 처리 유틸리티 함수 임포트
 import {
@@ -180,12 +182,20 @@ export default function Home() {
 
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">대시보드</h1>
-        <Link href="/calendar" className="inline-flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <span>캘린더 보기</span>
-        </Link>
+        <div className="flex space-x-4">
+          <Link href="/recommend" className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            <span>문제 추천</span>
+          </Link>
+          <Link href="/calendar" className="inline-flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span>캘린더 보기</span>
+          </Link>
+        </div>
       </div>
 
       <main>
@@ -346,6 +356,32 @@ export default function Home() {
             {/* 📉 하단 영역: 알림 및 갤러리 */}
             <section className="mb-8">
               <h2 className="text-xl font-semibold mb-4">현황 및 알림</h2>
+              
+              {/* 백준 문제 추천 기능 홍보 */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg shadow-lg p-6 mb-6 text-white">
+                <h3 className="text-xl font-bold mb-2">✨ 새로운 기능: 백준 문제 추천 시스템</h3>
+                <p className="mb-3">
+                  solved.ac API 기반으로 개인화된 백준 문제를 추천해 드립니다.
+                  코딩테스트 준비와 백준 티어 향상에 도움이 필요하신가요?
+                </p>
+                <ul className="list-disc list-inside mb-4 space-y-1">
+                  <li>맞춤형 문제 추천: 풀이 패턴, 취약점 분석 기반</li>
+                  <li>데일리 챌린지: 리뷰, 적정 난이도, 도전 문제 3단계 구성</li>
+                  <li>코딩테스트 준비: 골드 티어 도달을 위한 체계적 로드맵</li>
+                </ul>
+                <LoggedLink 
+                  href="/recommend"
+                  className="inline-flex items-center bg-white text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors"
+                  id="baekjoon-recommend-link"
+                  metadata={{ from_page: 'index', action: 'goto_recommend' }}
+                >
+                  추천 받으러 가기
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </LoggedLink>
+              </div>
+              
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 <AlertCard 
                   title="최근 3일간 미제출자" 

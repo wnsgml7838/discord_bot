@@ -2,6 +2,7 @@ const discord = require('discord.js');
 const { Octokit } = require('@octokit/rest');
 const path = require('path');
 const { recommendBaekjoonProblems } = require('./discord_bot_problem_recommender');
+const discordLogger = require('../utils/discordLogger');
 
 // 환경 변수에서 토큰을 읽을 경우를 위한 dotenv 설정
 require('dotenv').config();
@@ -210,63 +211,260 @@ async function fetchHistoricalData(targetChannelId, resetData = false) {
   }
 }
 
-client.once('ready', () => {
-  console.log(`🤖 봇 로그인 성공: ${client.user.tag}`);
-  console.log(`🔗 초대 링크: https://discord.com/api/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot`);
+// 로깅 데이터를 처리하는 함수
+async function serverLog(type, options) {
+  try {
+    switch(type) {
+      case 'command':
+        await discordLogger.logCommand(options);
+        break;
+      case 'message':
+        await discordLogger.logMessage(options);
+        break;
+      case 'join':
+        await discordLogger.logJoin(options);
+        break;
+      case 'leave':
+        await discordLogger.logLeave(options);
+        break;
+      case 'activity':
+        await discordLogger.logActivity(options);
+        break;
+      case 'error':
+        await discordLogger.logError(options);
+        break;
+      default:
+        await discordLogger.logToDiscord('info', options.serverId, options.serverName, options.userId, options.userName, options.data);
+    }
+  } catch (error) {
+    console.error(`로깅 중 오류 발생 (${type}):`, error);
+  }
+}
+
+// Discord 봇 이벤트 핸들러 설정
+client.on('ready', () => {
+  console.log(`봇이 성공적으로 로그인되었습니다: ${client.user.tag}`);
+  
+  // 봇 시작 로깅
+  serverLog('activity', {
+    serverId: 'global',
+    serverName: 'Global',
+    activityType: 'bot_start',
+    details: {
+      botName: client.user.tag,
+      botId: client.user.id,
+      serverCount: client.guilds.cache.size,
+      totalUsers: client.users.cache.size
+    }
+  });
+  
+  // 봇이 있는 모든 서버 정보 로깅
+  client.guilds.cache.forEach(guild => {
+    serverLog('activity', {
+      serverId: guild.id,
+      serverName: guild.name,
+      activityType: 'bot_server_info',
+      details: {
+        memberCount: guild.memberCount,
+        owner: guild.ownerId,
+        channels: guild.channels.cache.size,
+        createdAt: guild.createdAt.toISOString()
+      }
+    });
+  });
   
   // 봇 시작 시 로그 파일 불러오기
   getLogFileFromGitHub().catch(console.error);
 });
 
-client.on('messageCreate', async (message) => {
+// 서버 참가 이벤트
+client.on('guildCreate', guild => {
+  console.log(`새로운 서버에 추가됨: ${guild.name} (id: ${guild.id})`);
+  
+  serverLog('join', {
+    serverId: guild.id,
+    serverName: guild.name,
+    userId: client.user.id,
+    userName: client.user.tag,
+    joinedAt: new Date().toISOString()
+  });
+});
+
+// 서버 퇴장 이벤트
+client.on('guildDelete', guild => {
+  console.log(`서버에서 제거됨: ${guild.name} (id: ${guild.id})`);
+  
+  serverLog('leave', {
+    serverId: guild.id,
+    serverName: guild.name,
+    userId: client.user.id,
+    userName: client.user.tag,
+    leftAt: new Date().toISOString()
+  });
+});
+
+// 메시지 이벤트
+client.on('messageCreate', async message => {
+  // 봇 메시지 무시
   if (message.author.bot) return;
   
-  // 로그 출력 (서버 메시지인지 DM인지 구분)
-  const messageType = message.guild ? '서버 메시지' : 'DM';
-  console.log(`메시지 수신 [${messageType}]: ${message.author.tag}: ${message.content}`);
-
-  // 백준 문제 추천 명령어 처리
-  if (message.content.startsWith('!백준추천') || message.content.startsWith('!문제추천')) {
-    console.log(`백준 추천 명령어 감지: ${message.content}`);
-    const args = message.content.split(' ');
-    if (args.length < 2) {
-      console.log('백준 아이디 누락');
-      message.reply('백준 아이디를 입력해주세요. 예시: `!백준추천 jjojo2025`');
-      return;
-    }
-
-    const handle = args[1].trim();
-    console.log(`백준 아이디: ${handle}`);
+  // 서버 및 사용자 정보
+  const serverId = message.guild ? message.guild.id : 'dm';
+  const serverName = message.guild ? message.guild.name : 'Direct Message';
+  const userId = message.author.id;
+  const userName = message.author.tag;
+  
+  // 명령어 처리
+  if (message.content.startsWith('!') || message.content.startsWith('/')) {
+    const args = message.content.slice(1).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
     
-    try {
-      // 로딩 메시지
-      console.log('로딩 메시지 전송 중...');
+    // 명령어 실행 로깅
+    serverLog('command', {
+      serverId,
+      serverName,
+      userId,
+      userName,
+      command,
+      args,
+      channelId: message.channel.id,
+      channelName: message.channel.name || 'DM'
+    });
+    
+    // 백준 문제 추천 명령어 처리
+    if (command === '백준추천' || command === '문제추천') {
+      console.log(`백준 추천 명령어 감지: ${message.content}`);
+      
+      // 명령어 실행 로깅
+      serverLog('command', {
+        serverId,
+        serverName,
+        userId,
+        userName,
+        command: '백준추천',
+        args,
+        channelId: message.channel.id,
+        channelName: message.channel.name || 'DM'
+      });
+      
+      // 인자 확인
+      if (!args[0]) {
+        await message.reply('백준 아이디를 입력해주세요. 예: !백준추천 joonhee7838');
+        return;
+      }
+      
+      // 추천 모드 확인
+      const handle = args[0];
+      const mode = args[1] || 'personalized';
+      console.log(`백준 추천 모드: ${mode}`);
+      
+      // 사용자에게 로딩 메시지 표시
       const loadingMessage = await message.reply('백준 문제를 추천하는 중입니다... (약 10-20초 소요)');
       
-      // 백준 문제 추천 처리
-      console.log('백준 추천 함수 호출 중...');
-      const recommendation = await recommendBaekjoonProblems(handle);
-      console.log('백준 추천 완료, 결과 전송 중...');
+      try {
+        // 백준 문제 추천 처리
+        console.log('백준 추천 함수 호출 중...');
+        const result = await recommendBaekjoonProblems(handle, mode);
+        console.log('백준 추천 완료, 결과 전송 중...');
+        
+        // 로딩 메시지 제거
+        await loadingMessage.delete();
+        
+        // 추천 결과 전송
+        await message.reply({
+          content: `${message.author}님, **${handle}**님의 백준 추천 문제입니다:`,
+          embeds: [
+            {
+              title: '백준 문제 추천 결과',
+              description: result,
+              color: 0x0099ff
+            }
+          ]
+        });
+        
+        // 추천 결과 로깅
+        serverLog('activity', {
+          serverId,
+          serverName,
+          userId,
+          userName,
+          activityType: 'baekjoon_recommend',
+          details: {
+            handle,
+            mode,
+            success: true
+          }
+        });
+      } catch (error) {
+        console.error('백준 문제 추천 오류:', error);
+        
+        // 로딩 메시지 제거
+        await loadingMessage.delete();
+        
+        // 오류 메시지 전송
+        await message.reply(`문제 추천 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
+        
+        // 오류 로깅
+        serverLog('error', {
+          serverId,
+          serverName,
+          userId,
+          userName,
+          error,
+          context: {
+            command: '백준추천',
+            handle,
+            mode
+          }
+        });
+      }
+    }
+  }
+  
+  // 이미지 첨부 메시지 처리
+  if (message.attachments.size > 0) {
+    let hasImage = false;
+    message.attachments.forEach(attachment => {
+      if (attachment.contentType && attachment.contentType.startsWith("image/")) {
+        hasImage = true;
+      }
+    });
+    
+    if (hasImage) {
+      // 이미지 제출 로깅
+      serverLog('activity', {
+        serverId,
+        serverName,
+        userId,
+        userName,
+        activityType: 'image_submission',
+        details: {
+          channelId: message.channel.id,
+          channelName: message.channel.name || 'DM',
+          messageId: message.id,
+          attachmentCount: message.attachments.size
+        }
+      });
       
-      // 결과 메시지 전송
-      await loadingMessage.edit(recommendation);
-      console.log('결과 전송 완료');
-    } catch (error) {
-      console.error('백준 문제 추천 오류:', error);
-      message.reply('문제 추천 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      // 이미지 처리 및 로깅
+      processImageAttachments(message);
+    }
+  }
+});
+
+// 이미지 첨부 처리 함수
+async function processImageAttachments(message) {
+  try {
+    // 서버 및 사용자 정보
+    const serverId = message.guild ? message.guild.id : 'dm';
+    const serverName = message.guild ? message.guild.name : 'Direct Message';
+    
+    // DM의 경우 처리하지 않음
+    if (!message.guild) {
+      message.reply('DM에서는 이미지 저장 기능을 사용할 수 없습니다. 서버 채팅에서 이미지를 공유해주세요.');
+      return;
     }
     
-    return;
-  }
-
-  // 서버 채팅이 아닌 DM의 경우에는 이미지 저장을 건너뜁니다
-  if (!message.guild && message.attachments.size > 0) {
-    message.reply('DM에서는 이미지 저장 기능을 사용할 수 없습니다. 서버 채팅에서 이미지를 공유해주세요.');
-    return;
-  }
-
-  // 기존 이미지 처리 코드는 서버 채팅인 경우에만 실행
-  if (message.guild && message.attachments.size > 0) {
     for (const [, attachment] of message.attachments) {
       if (attachment.contentType && attachment.contentType.startsWith("image/")) {
         const nickname = message.author.username;
@@ -280,14 +478,14 @@ client.on('messageCreate', async (message) => {
         const kstTimestampStr = kstTimestamp.toISOString().replace('T', ' ').substr(0, 19);
         
         const image_url = attachment.url;
-
+        
         // 터미널 출력
         console.log("👤 닉네임:", nickname);
         console.log("🕒 전송 시간 (UTC):", utcTimestampStr);
         console.log("🕒 전송 시간 (KST):", kstTimestampStr);
         console.log("🖼️ 이미지 URL:", image_url);
         console.log("-".repeat(50));
-
+        
         try {
           // 로그 데이터 추가
           const newLog = {
@@ -296,7 +494,9 @@ client.on('messageCreate', async (message) => {
             timestampStr: utcTimestampStr, 
             kstTimestampStr: kstTimestampStr,  // KST 시간 추가
             image_url,
-            messageId: message.id // 메시지 ID 추가
+            messageId: message.id, // 메시지 ID 추가
+            serverId,  // 서버 ID 추가
+            serverName // 서버 이름 추가
           };
           
           // 로그 데이터가 아직 로드되지 않았다면 로드
@@ -313,34 +513,67 @@ client.on('messageCreate', async (message) => {
           console.log('인증 로그가 GitHub에 저장되었습니다.');
         } catch (error) {
           console.error('로그 저장 오류:', error);
+          
+          // 로그 저장 오류 기록
+          serverLog('error', {
+            serverId,
+            serverName,
+            userId: message.author.id,
+            userName: message.author.tag,
+            error,
+            context: {
+              activity: 'save_image_log',
+              channelId: message.channel.id,
+              messageId: message.id
+            }
+          });
         }
       }
     }
+  } catch (error) {
+    console.error('이미지 처리 중 오류 발생:', error);
+    
+    // 이미지 처리 오류 기록
+    serverLog('error', {
+      serverId: message.guild ? message.guild.id : 'dm',
+      serverName: message.guild ? message.guild.name : 'Direct Message',
+      userId: message.author.id,
+      userName: message.author.tag,
+      error,
+      context: {
+        activity: 'process_image',
+        channelId: message.channel.id,
+        messageId: message.id
+      }
+    });
   }
-});
+}
 
-// 봇 시작 함수
+// Discord 봇 시작 함수
 async function startBot() {
   try {
-    // GitHub 토큰 확인
-    if (!GITHUB_TOKEN) {
-      console.error('GitHub 토큰이 없습니다. .env 파일에 GITHUB_TOKEN을 설정해주세요.');
-      return;
-    }
-    
-    // GitHub 저장소 정보 확인
-    if (!GITHUB_OWNER || !GITHUB_REPO) {
-      console.error('GitHub 저장소 정보가 없습니다. .env 파일에 GITHUB_OWNER와 GITHUB_REPO를 설정해주세요.');
-      return;
-    }
-    
-    // 로그 파일 불러오기
+    // GitHub에서 로그 데이터 가져오기
     await getLogFileFromGitHub();
     
-    // 디스코드 봇 로그인
+    // Discord에 로그인
     await client.login(TOKEN);
+    console.log('봇이 시작되었습니다.');
+    
+    return client;
   } catch (error) {
-    console.error('봇 시작 오류:', error);
+    console.error('봇 시작 중 오류 발생:', error);
+    
+    // 오류 로깅
+    serverLog('error', {
+      serverId: 'global',
+      serverName: 'Global',
+      error,
+      context: {
+        activity: 'bot_start'
+      }
+    });
+    
+    throw error;
   }
 }
 
@@ -365,4 +598,8 @@ async function startBotWithHistoricalData(channelId, resetData = false) {
 }
 
 // Discord 봇 시작 함수를 export
-module.exports = { startBot, fetchHistoricalData, startBotWithHistoricalData }; 
+module.exports = {
+  startBot,
+  startBotWithHistoricalData,
+  client
+}; 
