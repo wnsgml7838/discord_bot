@@ -21,7 +21,9 @@ intents.add(
   discord.IntentsBitField.Flags.Guilds,
   discord.IntentsBitField.Flags.GuildMessages,
   discord.IntentsBitField.Flags.MessageContent,
-  discord.IntentsBitField.Flags.DirectMessages // DM 메시지 수신 권한 추가
+  discord.IntentsBitField.Flags.DirectMessages, // DM 메시지 수신 권한 추가
+  discord.IntentsBitField.Flags.DirectMessageReactions, // DM 반응 권한 추가
+  discord.IntentsBitField.Flags.DirectMessageTyping // DM 타이핑 권한 추가
 );
 
 const client = new discord.Client({ intents });
@@ -210,6 +212,7 @@ async function fetchHistoricalData(targetChannelId, resetData = false) {
 
 client.once('ready', () => {
   console.log(`🤖 봇 로그인 성공: ${client.user.tag}`);
+  console.log(`🔗 초대 링크: https://discord.com/api/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot`);
   
   // 봇 시작 시 로그 파일 불러오기
   getLogFileFromGitHub().catch(console.error);
@@ -220,27 +223,34 @@ client.on('messageCreate', async (message) => {
   
   // 로그 출력 (서버 메시지인지 DM인지 구분)
   const messageType = message.guild ? '서버 메시지' : 'DM';
-  console.log(`메시지 수신 [${messageType}]: ${message.content}`);
+  console.log(`메시지 수신 [${messageType}]: ${message.author.tag}: ${message.content}`);
 
   // 백준 문제 추천 명령어 처리
   if (message.content.startsWith('!백준추천') || message.content.startsWith('!문제추천')) {
+    console.log(`백준 추천 명령어 감지: ${message.content}`);
     const args = message.content.split(' ');
     if (args.length < 2) {
+      console.log('백준 아이디 누락');
       message.reply('백준 아이디를 입력해주세요. 예시: `!백준추천 jjojo2025`');
       return;
     }
 
     const handle = args[1].trim();
+    console.log(`백준 아이디: ${handle}`);
     
     try {
       // 로딩 메시지
+      console.log('로딩 메시지 전송 중...');
       const loadingMessage = await message.reply('백준 문제를 추천하는 중입니다... (약 10-20초 소요)');
       
       // 백준 문제 추천 처리
+      console.log('백준 추천 함수 호출 중...');
       const recommendation = await recommendBaekjoonProblems(handle);
+      console.log('백준 추천 완료, 결과 전송 중...');
       
       // 결과 메시지 전송
       await loadingMessage.edit(recommendation);
+      console.log('결과 전송 완료');
     } catch (error) {
       console.error('백준 문제 추천 오류:', error);
       message.reply('문제 추천 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
