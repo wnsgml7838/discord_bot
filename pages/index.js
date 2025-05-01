@@ -7,7 +7,7 @@ import {
 import { ko } from 'date-fns/locale';
 import Link from 'next/link';
 import LoggedLink from '../components/LoggedLink';
-import { logUserActivity } from '../utils/activityLogger';
+import { logUserActivity, logDirectToDiscord } from '../utils/activityLogger';
 
 // 데이터 처리 유틸리티 함수 임포트
 import {
@@ -47,6 +47,33 @@ export default function Home() {
     consecutiveNonSubmittersData: { labels: [], data: [], average: 0 },
     reminderEffectData: { labels: [], data: [] }
   });
+
+  // 웹훅 로깅 테스트
+  useEffect(() => {
+    // 페이지 로드 시 환경 변수 및 웹훅 테스트
+    if (typeof window !== 'undefined') {
+      console.log('NEXT_PUBLIC_DISCORD_WEBHOOK_URL 상태:', 
+        process.env.NEXT_PUBLIC_DISCORD_WEBHOOK_URL ? '설정됨 ✅' : '설정되지 않음 ❌');
+      
+      // 직접 웹훅 호출 테스트 (배포된 사이트에서만 실행)
+      if (window.location.hostname !== 'localhost') {
+        console.log('웹훅 직접 호출 테스트 시작...');
+        
+        // 직접 Discord로 메시지 전송 시도
+        logDirectToDiscord('page_load_test', 'test_user', window.location.pathname, {
+          test: true,
+          host: window.location.hostname,
+          timestamp: new Date().toISOString()
+        })
+        .then(result => {
+          console.log('웹훅 테스트 결과:', result);
+        })
+        .catch(error => {
+          console.error('웹훅 테스트 오류:', error);
+        });
+      }
+    }
+  }, []);
 
   useEffect(() => {
     // 로그 데이터 가져오기
@@ -167,6 +194,26 @@ export default function Home() {
     setSelectedImage(null);
   };
 
+  // 디버깅 웹훅 테스트 함수
+  const testWebhook = () => {
+    console.log('웹훅 수동 테스트 시작...');
+    
+    logDirectToDiscord('manual_test', 'test_user', window.location.pathname, {
+      test: true,
+      manually_triggered: true,
+      host: window.location.hostname,
+      timestamp: new Date().toISOString()
+    })
+    .then(result => {
+      console.log('수동 웹훅 테스트 결과:', result);
+      alert(result.success ? '웹훅 테스트 성공! 콘솔에서 자세한 정보를 확인하세요.' : '웹훅 테스트 실패! 콘솔에서 오류를 확인하세요.');
+    })
+    .catch(error => {
+      console.error('수동 웹훅 테스트 오류:', error);
+      alert('웹훅 테스트 중 오류가 발생했습니다. 콘솔에서 자세한 정보를 확인하세요.');
+    });
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
       <Head>
@@ -178,6 +225,15 @@ export default function Home() {
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-center mb-2">YEARDREAM 5th ALGORITHM </h1>
         <p className="text-center text-gray-600">스터디 참여 현황 및 데이터 분석</p>
+        {/* 개발자 도구용 디버그 버튼 (숨겨진 형태) */}
+        <div className="mt-2 text-center">
+          <button 
+            onClick={testWebhook}
+            className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
+          >
+            웹훅 테스트
+          </button>
+        </div>
       </header>
 
       <div className="flex justify-between items-center mb-6">

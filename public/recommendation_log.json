@@ -1,0 +1,21 @@
+[
+  {
+    "id": "rec_1746113445477798",
+    "handle": "joonhee7838",
+    "recommendedAt": "2025-05-01T15:30:39.417Z",
+    "recommendMode": "personalized",
+    "userTier": "실버 4",
+    "mainTags": [
+      "implementation",
+      "math",
+      "string"
+    ],
+    "recommendedProblems": [],
+    "problemClicked": null,
+    "clientInfo": {
+      "userAgent": "node-fetch",
+      "ip": "::ffff:127.0.0.1",
+      "referrer": ""
+    }
+  }
+]
