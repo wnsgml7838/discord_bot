@@ -6,6 +6,11 @@ import { createHash } from 'crypto';
 // Discord Webhook URL 설정
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 
+// Solved.ac API 엔드포인트
+const SOLVED_API_BASE = "https://solved.ac/api";
+const USER_INFO_ENDPOINT = `${SOLVED_API_BASE}/v3/user/show`;
+const PROBLEM_SEARCH_ENDPOINT = `${SOLVED_API_BASE}/v3/search/problem`;
+
 /**
  * 서버 측에서 활동을 로깅하는 함수
  * @param {string} event - 이벤트 이름
@@ -61,6 +66,274 @@ async function logServerActivity(event, metadata, req) {
 }
 
 /**
+ * 티어 이름 가져오기 (1~30 -> 브론즈 5 ~ 루비 1)
+ * @param {number} tier - 티어 번호 (1-30)
+ * @returns {string} - 티어 이름
+ */
+function getTierNameKo(tier) {
+  const tierColors = ["브론즈", "실버", "골드", "플래티넘", "다이아몬드", "루비"];
+  const tierLevels = ["5", "4", "3", "2", "1"];
+  
+  if (tier === 0) {
+    return "언레이티드";
+  }
+  
+  const colorIdx = Math.floor((tier - 1) / 5);
+  const levelIdx = 4 - ((tier - 1) % 5);
+  
+  if (colorIdx >= tierColors.length) {
+    return "마스터";
+  }
+  
+  return `${tierColors[colorIdx]} ${tierLevels[levelIdx]}`;
+}
+
+/**
+ * 티어 색상 가져오기
+ * @param {number} tier - 티어 번호 (1-30)
+ * @returns {string} - 색상 코드
+ */
+function getTierColor(tier) {
+  if (tier <= 0) return "#000000"; // Unrated
+  
+  const tierColors = [
+    "#ad5600", // Bronze
+    "#435f7a", // Silver
+    "#ec9a00", // Gold
+    "#27e2a4", // Platinum
+    "#00b4fc", // Diamond
+    "#ff0062"  // Ruby
+  ];
+  
+  const colorIdx = Math.floor((tier - 1) / 5);
+  return colorIdx < tierColors.length ? tierColors[colorIdx] : "#000000";
+}
+
+/**
+ * 사용자 정보 가져오기
+ * @param {string} handle - 백준 ID
+ * @returns {Object|null} - 사용자 정보
+ */
+async function getUserInfo(handle) {
+  try {
+    const response = await fetch(`${USER_INFO_ENDPOINT}?handle=${handle}`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { error: "사용자를 찾을 수 없습니다." };
+      }
+      return { error: `API 오류: ${response.status}` };
+    }
+    
+    const data = await response.json();
+    
+    // 필요한 정보만 추출
+    return {
+      handle: data.handle,
+      tier: data.tier || 0,
+      solvedCount: data.solvedCount || 0,
+      tierName: getTierNameKo(data.tier || 0),
+      tierColor: getTierColor(data.tier || 0)
+    };
+  } catch (error) {
+    console.error('사용자 정보 가져오기 오류:', error);
+    return { error: error.message };
+  }
+}
+
+/**
+ * 문제 검색하기
+ * @param {Object} params - 검색 파라미터
+ * @returns {Array|null} - 문제 목록
+ */
+async function searchProblems(params) {
+  try {
+    // 쿼리 파라미터 생성
+    const queryParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      queryParams.append(key, value);
+    }
+    
+    const response = await fetch(`${PROBLEM_SEARCH_ENDPOINT}?${queryParams.toString()}`);
+    
+    if (!response.ok) {
+      return { error: `API 오류: ${response.status}` };
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('문제 검색 오류:', error);
+    return { error: error.message };
+  }
+}
+
+/**
+ * 사용자에게 적합한 문제 추천하기
+ * @param {string} handle - 백준 ID
+ * @param {number} page - 페이지 번호
+ * @returns {Object} - 추천 결과
+ */
+async function recommendProblems(handle, page = 1) {
+  try {
+    // 1. 사용자 정보 가져오기
+    const userInfo = await getUserInfo(handle);
+    
+    if (userInfo.error) {
+      return { error: userInfo.error };
+    }
+    
+    // 2. 사용자 티어에 맞는 문제 검색 (티어 기반)
+    let minLevel = Math.max(1, userInfo.tier - 5);
+    let maxLevel = Math.min(30, userInfo.tier + 5);
+    
+    // 티어가 낮은 경우 상향 조정
+    if (userInfo.tier < 6) {
+      minLevel = 1;
+      maxLevel = 10;
+    }
+    
+    // 3. 검색 파라미터 구성
+    const params = {
+      query: `solved_by:!${handle} tier:${minLevel}..${maxLevel}`,
+      page: page,
+      sort: "random",
+      direction: "asc",
+      limit: 3
+    };
+    
+    // 4. 문제 검색
+    const searchResult = await searchProblems(params);
+    
+    if (searchResult.error) {
+      return { error: searchResult.error };
+    }
+    
+    // 5. 추천 문제 형식화
+    const recommendations = formatRecommendations(searchResult.items, userInfo);
+    
+    return {
+      userInfo,
+      recommendations,
+      page
+    };
+  } catch (error) {
+    console.error('문제 추천 오류:', error);
+    return { error: error.message };
+  }
+}
+
+/**
+ * 추천 문제 형식화하기
+ * @param {Array} problems - 문제 목록
+ * @param {Object} userInfo - 사용자 정보
+ * @returns {Array} - 형식화된 추천 문제 목록
+ */
+function formatRecommendations(problems, userInfo) {
+  return problems.map((problem, index) => ({
+    id: problem.problemId,
+    title: problem.titleKo,
+    level: problem.level,
+    tierName: getTierNameKo(problem.level),
+    tierColor: getTierColor(problem.level),
+    tags: problem.tags.map(tag => tag.displayNames.find(n => n.language === "ko")?.name || tag.key),
+    acceptedUserCount: problem.acceptedUserCount,
+    averageTries: problem.averageTries,
+    score: Math.round(90 - Math.abs(userInfo.tier - problem.level) * 2 + Math.random() * 10)
+  }));
+}
+
+/**
+ * 추천 결과 HTML 생성
+ * @param {Object} result - 추천 결과
+ * @returns {string} - HTML
+ */
+function generateRecommendHTML(result) {
+  // 에러가 있는 경우
+  if (result.error) {
+    return `
+      <h2 class='text-3xl font-black text-black bg-yellow-200 p-2 rounded-md'>📋 추천 문제</h2>
+      <div class='border-t-4 border-black my-3'></div>
+      <div class='p-2 mb-4 bg-red-100 rounded-md text-black'>
+        <p class='font-bold mb-1'>⚠️ 오류 발생</p>
+        <p>${result.error}</p>
+      </div>
+      <div class='py-4 text-black font-black bg-red-200 p-2 rounded-md'>추천 문제를 찾을 수 없습니다.</div>
+    `;
+  }
+  
+  const { userInfo, recommendations, page } = result;
+  
+  // HTML 헤더 생성
+  let html = `
+    <h2 class='text-3xl font-black text-black bg-yellow-200 p-2 rounded-md'>📋 추천 문제</h2>
+    <div class='border-t-4 border-black my-3'></div>
+    <div class='p-2 mb-4 bg-blue-100 rounded-md text-black'>
+      <p class='font-bold mb-1'>사용자 정보:</p>
+      <p>백준 ID: ${userInfo.handle}</p>
+      <p>사용자 티어: ${userInfo.tierName}</p>
+      <p>해결한 문제 수: ${userInfo.solvedCount}개</p>
+      <p>페이지: ${page}</p>
+    </div>
+    <div class='py-2 mb-4 bg-yellow-100 text-black rounded-md p-2'>
+      <p class='font-bold'>추천 방식: 티어 기반 추천</p>
+      <p>사용자의 티어에 맞는 문제를 추천합니다.</p>
+    </div>
+  `;
+  
+  // 추천 결과가 없는 경우
+  if (recommendations.length === 0) {
+    html += `
+      <div class='py-4 text-black font-black bg-red-200 p-2 rounded-md'>현재 조건에 맞는 추천 문제를 찾을 수 없습니다.</div>
+    `;
+  } else {
+    // 각 문제 카드 생성
+    recommendations.forEach((problem, index) => {
+      html += `
+        <div class='problem-card mb-4 p-4 rounded-lg bg-white shadow-md border border-gray-300'>
+          <div class='flex justify-between items-start'>
+            <h3 class='text-lg font-medium text-gray-800'>
+              <span class='inline-block mr-2 px-2 py-1 rounded-md text-white text-sm font-medium' style='background-color: ${problem.tierColor};'>${problem.tierName}</span>
+              ${index + 1}. ${problem.title} <span class='text-gray-600 font-normal'>#${problem.id}</span>
+            </h3>
+            <span class='text-lg font-medium text-gray-700'>${problem.score}점</span>
+          </div>
+          
+          <div class='mt-1 text-sm text-gray-600'>
+            <span>푼 사람 수: ${problem.acceptedUserCount || 0}명</span>
+            <span class='ml-3'>평균 시도: ${problem.averageTries?.toFixed(1) || '정보 없음'}</span>
+          </div>
+          
+          <div class='mt-2'>
+            <span class='text-gray-700'>태그:</span>
+            ${problem.tags.map(tag => `<span class='inline-block mr-1 px-2 py-0.5 bg-blue-600 rounded-md text-sm text-white'>${tag}</span>`).join('')}
+          </div>
+          
+          <div class='mt-3'>
+            <a href='https://boj.kr/${problem.id}' target='_blank' class='inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors'>
+              <svg xmlns='http://www.w3.org/2000/svg' class='h-4 w-4 mr-1' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14' />
+              </svg>
+              문제 풀기
+            </a>
+          </div>
+        </div>
+      `;
+    });
+  }
+  
+  // 페이지 네비게이션 안내
+  html += `
+    <div class='py-3 bg-gray-100 rounded-md p-4 text-center'>
+      <p class='font-medium text-gray-800 mb-2'>페이지 ${page} 표시 중</p>
+      <p class='text-sm text-gray-600'>더 많은 문제를 보려면 페이지 버튼을 클릭하세요.</p>
+    </div>
+  `;
+  
+  return html;
+}
+
+/**
  * 백준 문제 추천 API 핸들러
  * @param {object} req - HTTP 요청 객체
  * @param {object} res - HTTP 응답 객체
@@ -89,129 +362,29 @@ export default async function handler(req, res) {
 
     // API 호출 로깅
     await logServerActivity('baekjoon_api_call', { handle, page: pageNum }, req);
-    
-    // 스크립트 경로
-    const scriptPath = path.join(process.cwd(), 'bot', 'commands', 'baekjoon_recommender.py');
-    
-    console.log(`백준 문제 추천 시작: ${handle}, 페이지: ${pageNum}`);
-    console.log(`실행 경로: python ${scriptPath} ${handle} ${pageNum}`);
 
-    // Python 스크립트 실행
-    exec(`python ${scriptPath} ${handle} ${pageNum}`, {
-      timeout: 30000 // 30초 타임아웃
-    }, async (error, stdout, stderr) => {
-      if (error) {
-        console.error('백준 문제 추천 오류:', error.message);
-        console.error('STDERR:', stderr);
-        
-        // 오류 로깅
-        await logServerActivity('baekjoon_api_exec_error', { 
-          handle, 
-          page: pageNum,
-          error: error.message,
-          stderr
-        }, req);
-        
-        // 오류가 발생하면 예시 응답을 대신 반환 (오류 발생 표시와 함께)
-        const userTier = "정보 없음";
-        const result = generateExampleResponse(handle, pageNum, true);
-        
-        await logServerActivity('baekjoon_api_fallback', { 
-          handle, 
-          page: pageNum,
-          error: error.message
-        }, req);
-        
-        return res.status(200).json({ 
-          success: true,
-          is_fallback: true,
-          result: result,
-          userInfo: {
-            handle,
-            tier: userTier
-          },
-          page: pageNum,
-          error: error.message
-        });
-      }
-      
-      if (stderr) {
-        console.warn('백준 문제 추천 경고:', stderr);
-      }
-      
-      console.log('백준 문제 추천 완료');
-      
-      // stdout에서 HTML 결과 부분만 추출
-      // 시작 표시: <h2 class='text-3xl font-black text-black bg-yellow-200 p-2 rounded-md'>📋 추천 문제
-      // 또는 시작부터 끝까지의 출력이 HTML 결과일 수 있음
-      let result = stdout;
-      let noResults = false;
-      
-      // HTML 시작 부분을 찾습니다
-      const htmlStartIndex = stdout.indexOf("<h2 class='text-3xl font-black text-black bg-yellow-200 p-2 rounded-md'>📋 추천 문제");
-      
-      if (htmlStartIndex !== -1) {
-        // HTML 부분만 추출합니다
-        result = stdout.substring(htmlStartIndex);
-      } else if (stdout.includes("현재 조건에 맞는 추천 문제를 찾을 수 없습니다")) {
-        // 결과가 없는 경우 기본 메시지 생성
-        result = `<h2 class='text-3xl font-black text-black bg-yellow-200 p-2 rounded-md'>📋 추천 문제</h2>
-                  <div class='border-t-4 border-black my-3'></div>
-                  <div class='py-4 text-black font-black bg-red-200 p-2 rounded-md'>현재 조건에 맞는 추천 문제를 찾을 수 없습니다.</div>`;
-        noResults = true;
-      }
-      
-      // 사용자 정보 추출 (있는 경우)
-      let userTier = "정보 없음";
-      const tierMatch = stdout.match(/사용자 티어: (.+)/);
-      if (tierMatch && tierMatch[1]) {
-        userTier = tierMatch[1];
-      }
-      
-      // 결과 로깅
-      await logServerActivity('baekjoon_api_result', { 
-        handle, 
-        page: pageNum,
-        user_tier: userTier,
-        no_results: noResults
-      }, req);
-      
-      return res.status(200).json({ 
-        success: true, 
-        result: result,
-        userInfo: {
-          handle,
-          tier: userTier
-        },
-        page: pageNum
-      });
-    });
+    console.log(`백준 문제 추천 시작: ${handle}, 페이지: ${pageNum}`);
     
-    /* 
-    // Vercel 환경에서는 Python 스크립트 실행이 불가능하므로 하드코딩된 예시 응답 반환
-    const userTier = "골드 4"; // 예시 티어
+    // solved.ac API 직접 호출하여 문제 추천
+    const result = await recommendProblems(handle, pageNum);
     
-    // 예시 HTML 응답 생성
-    const result = generateExampleResponse(handle, pageNum);
+    // 결과 HTML 생성
+    const htmlResult = generateRecommendHTML(result);
     
     // 결과 로깅
     await logServerActivity('baekjoon_api_result', { 
       handle, 
       page: pageNum,
-      user_tier: userTier,
-      is_example: true
+      user_tier: result.userInfo?.tierName || '정보 없음',
+      has_error: !!result.error
     }, req);
     
     return res.status(200).json({ 
       success: true, 
-      result: result,
-      userInfo: {
-        handle,
-        tier: userTier
-      },
+      result: htmlResult,
+      userInfo: result.userInfo || { handle, tier: '정보 없음' },
       page: pageNum
     });
-    */
   } catch (error) {
     console.error('백준 문제 추천 처리 중 예외 발생:', error);
     
@@ -226,183 +399,4 @@ export default async function handler(req, res) {
       details: error.message
     });
   }
-}
-
-/**
- * 예시 응답 HTML 생성 함수
- * @param {string} handle - 백준 ID
- * @param {number} page - 페이지 번호
- * @param {boolean} isError - 오류 발생 여부
- * @returns {string} - HTML 응답
- */
-function generateExampleResponse(handle, page, isError = false) {
-  // 예시 문제 데이터
-  const exampleProblems = [
-    {
-      id: 1000,
-      title: "A+B",
-      level: 1,
-      tags: ["수학", "구현", "사칙연산"],
-      score: 95,
-      tierName: "브론즈 5",
-      tierColor: "#ad5600",
-      difficulty: 90,
-      tag_similarity: 85,
-      popularity: 100,
-      solved_count: 12345
-    },
-    {
-      id: 1001,
-      title: "A-B",
-      level: 2,
-      tags: ["수학", "구현", "사칙연산"],
-      score: 92,
-      tierName: "브론즈 4",
-      tierColor: "#ad5600",
-      difficulty: 85,
-      tag_similarity: 80,
-      popularity: 98,
-      solved_count: 10234
-    },
-    {
-      id: 2557,
-      title: "Hello World",
-      level: 1,
-      tags: ["구현"],
-      score: 90,
-      tierName: "브론즈 5",
-      tierColor: "#ad5600",
-      difficulty: 95,
-      tag_similarity: 70,
-      popularity: 100,
-      solved_count: 15678
-    }
-  ];
-  
-  // 추가 페이지에 대한 다른 예시 문제
-  const page2Problems = [
-    {
-      id: 2438,
-      title: "별 찍기 - 1",
-      level: 3,
-      tags: ["구현"],
-      score: 88,
-      tierName: "브론즈 3",
-      tierColor: "#ad5600",
-      difficulty: 80,
-      tag_similarity: 75,
-      popularity: 95,
-      solved_count: 9876
-    },
-    {
-      id: 2439,
-      title: "별 찍기 - 2",
-      level: 3,
-      tags: ["구현"],
-      score: 87,
-      tierName: "브론즈 3",
-      tierColor: "#ad5600",
-      difficulty: 78,
-      tag_similarity: 76,
-      popularity: 94,
-      solved_count: 9645
-    },
-    {
-      id: 10171,
-      title: "고양이",
-      level: 1,
-      tags: ["구현"],
-      score: 86,
-      tierName: "브론즈 5",
-      tierColor: "#ad5600",
-      difficulty: 98,
-      tag_similarity: 68,
-      popularity: 96,
-      solved_count: 8765
-    }
-  ];
-  
-  // 선택한 페이지에 따라 다른 문제 표시
-  const problems = page === 1 ? exampleProblems : page2Problems;
-  
-  // HTML 헤더 생성
-  let html = `
-    <h2 class='text-3xl font-black text-black bg-yellow-200 p-2 rounded-md'>📋 추천 문제</h2>
-    <div class='border-t-4 border-black my-3'></div>
-  `;
-  
-  // 오류 발생 시 알림 추가
-  if (isError) {
-    html += `
-    <div class='p-2 mb-4 bg-red-100 rounded-md text-black'>
-      <p class='font-bold mb-1'>⚠️ 오류 발생</p>
-      <p>Python 스크립트 실행 중 오류가 발생하여 예시 데이터를 표시합니다.</p>
-    </div>
-    `;
-  }
-  
-  html += `
-    <div class='p-2 mb-4 bg-blue-100 rounded-md text-black'>
-      <p class='font-bold mb-1'>사용자 정보:</p>
-      <p>백준 ID: ${handle}</p>
-      <p>사용자 티어: ${isError ? "정보 없음" : "골드 4"} ${isError ? "" : "(Vercel 환경 예시)"}</p>
-      <p>페이지: ${page}</p>
-      ${isError ? "" : "<p class='mt-2 text-xs text-gray-600'>※ Vercel 환경에서는 Python 스크립트를 실행할 수 없어 예시 데이터를 표시합니다.</p>"}
-    </div>
-    <div class='py-2 mb-4 bg-yellow-100 text-black rounded-md p-2'>
-      <p class='font-bold'>추천 방식: 태그 기반 추천</p>
-      <p>사용자의 풀이 패턴을 분석하여 맞춤형 문제를 추천합니다.</p>
-    </div>
-  `;
-  
-  // 각 문제 카드 생성
-  problems.forEach((problem, index) => {
-    html += `
-      <div class='problem-card mb-4 p-4 rounded-lg bg-white shadow-md border border-gray-300'>
-        <div class='flex justify-between items-start'>
-          <h3 class='text-lg font-medium text-gray-800'>
-            <span class='inline-block mr-2 px-2 py-1 rounded-md text-white text-sm font-medium' style='background-color: ${problem.tierColor};'>${problem.tierName}</span>
-            ${index + 1}. ${problem.title} <span class='text-gray-600 font-normal'>#${problem.id}</span>
-          </h3>
-          <span class='text-lg font-medium text-gray-700'>${problem.score}점</span>
-        </div>
-        
-        <div class='mt-1 text-sm text-gray-600'>
-          <span>푼 사람 수: ${problem.solved_count}명</span>
-        </div>
-        
-        <div class='mt-2'>
-          <span class='text-gray-700'>태그:</span>
-          ${problem.tags.map(tag => `<span class='inline-block mr-1 px-2 py-0.5 bg-blue-600 rounded-md text-sm text-white'>${tag}</span>`).join('')}
-        </div>
-        
-        <div class='mt-3'>
-          <a href='https://boj.kr/${problem.id}' target='_blank' class='inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors'>
-            <svg xmlns='http://www.w3.org/2000/svg' class='h-4 w-4 mr-1' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
-              <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14' />
-            </svg>
-            문제 풀기
-          </a>
-        </div>
-        
-        <div class='mt-3 text-sm text-gray-600'>
-          <div class='grid grid-cols-3 gap-2'>
-            <div>난이도 적합도: <span class='font-medium'>${problem.difficulty}</span></div>
-            <div>태그 유사도: <span class='font-medium'>${problem.tag_similarity}</span></div>
-            <div>인기도: <span class='font-medium'>${problem.popularity}</span></div>
-          </div>
-        </div>
-      </div>
-    `;
-  });
-  
-  // 페이지 네비게이션 안내
-  html += `
-    <div class='py-3 bg-gray-100 rounded-md p-4 text-center'>
-      <p class='font-medium text-gray-800 mb-2'>페이지 ${page} 표시 중</p>
-      <p class='text-sm text-gray-600'>더 많은 문제를 보려면 페이지 버튼을 클릭하세요.</p>
-    </div>
-  `;
-  
-  return html;
 } 
