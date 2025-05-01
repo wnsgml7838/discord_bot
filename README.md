@@ -31,3 +31,84 @@ npm run dev
 
 - Vercel에 배포할 경우 Vercel 대시보드에서 환경 변수를 설정하세요
 - 다른 서버에 배포할 경우 해당 서버에 `.env` 파일을 생성하거나 환경 변수를 설정하세요
+
+# Discord 봇 대시보드
+
+디스코드 봇을 이용한 학습 인증 및 통계 대시보드
+
+## 기능
+
+- 디스코드 채팅방에 이미지를 공유하면 자동으로 기록
+- 사용자별, 날짜별 인증 횟수 통계
+- 요일별, 시간대별 인증 패턴 분석
+- 시각화된 차트를 통한 통계 제공
+- **백준 알고리즘 문제 추천 기능**
+
+## 새로운 기능: 백준 문제 추천
+
+디스코드 채팅방에서 다음 명령어를 사용하여 백준 문제를 추천받을 수 있습니다:
+
+```
+!백준추천 [백준ID]
+```
+
+또는
+
+```
+!문제추천 [백준ID]
+```
+
+이 기능은 사용자가 최근에 푼 10개의 문제를 분석하여 유사한 태그의 문제를 추천해줍니다.
+
+### 필요 조건
+
+- Python 3.6 이상
+- Python 라이브러리: requests
+
+Python 라이브러리 설치:
+```
+pip install -r requirements.txt
+```
+
+## 설치 방법
+
+1. 저장소 클론하기
+```
+git clone https://github.com/wnsgml7838/discord_bot.git
+cd discord_bot
+```
+
+2. npm 패키지 설치
+```
+npm install
+```
+
+3. `.env` 파일 설정
+```
+DISCORD_TOKEN=your_discord_token
+GITHUB_TOKEN=your_github_token
+GITHUB_OWNER=your_github_username
+GITHUB_REPO=discord_bot
+```
+
+4. 봇 실행
+```
+node bot-start.js
+```
+
+5. 과거 메시지 수집 모드
+```
+node bot-start.js --historical --channel <channel_id>
+```
+
+## 기술 스택
+
+- Next.js
+- Discord.js
+- Chart.js
+- Tailwind CSS
+- Python (백준 문제 추천 기능)
+
+## 라이센스
+
+MIT
