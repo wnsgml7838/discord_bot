@@ -183,72 +183,25 @@ async function recommendProblems(handle, page = 1) {
       return { error: userInfo.error };
     }
     
-    // 2. 사용자 티어에 맞는 문제 검색 (티어 기반)
-    let minLevel = Math.max(1, userInfo.tier - 5);
-    let maxLevel = Math.min(30, userInfo.tier + 5);
+    // 2. 태그 기반 추천 문제 (2개)
+    const tagBasedProblems = await recommendTagBasedProblems(handle, userInfo.tier, page);
     
-    // 티어가 낮은 경우 상향 조정
-    if (userInfo.tier < 6) {
-      minLevel = 1;
-      maxLevel = 10;
-    }
+    // 3. 인기도 기반 추천 문제 (3개)
+    const popularityBasedProblems = await recommendPopularityBasedProblems(handle, userInfo.tier, page);
     
-    // 3. 먼저 사용자가 풀지 않은 문제 중 적절한 티어의 문제 검색
-    let params = {
-      query: `solved_by:!${handle} tier:${minLevel}..${maxLevel}`,
-      page: page,
-      sort: "random",
-      direction: "asc",
-      limit: 5
-    };
+    // 4. 모든 추천 문제 합치기
+    const recommendations = [
+      ...tagBasedProblems.map(p => ({...p, recommendationType: "태그 기반"})), 
+      ...popularityBasedProblems.map(p => ({...p, recommendationType: "인기도 기반"}))
+    ];
     
-    let searchResult = await searchProblems(params);
-    
-    // 결과가 없거나 오류가 있는 경우
-    if (searchResult.error || !searchResult.items || searchResult.items.length === 0) {
-      console.log('첫 번째 검색 실패, 더 넓은 범위로 검색합니다...');
-      
-      // 4. 티어 범위를 더 넓게 설정
-      minLevel = Math.max(1, userInfo.tier - 10);
-      maxLevel = Math.min(30, userInfo.tier + 10);
-      
-      params = {
-        query: `solved_by:!${handle} tier:${minLevel}..${maxLevel}`,
-        page: page,
-        sort: "random",
-        direction: "asc",
-        limit: 5
-      };
-      
-      searchResult = await searchProblems(params);
-      
-      // 여전히 결과가 없는 경우
-      if (searchResult.error || !searchResult.items || searchResult.items.length === 0) {
-        console.log('두 번째 검색 실패, 인기 있는 문제를 검색합니다...');
-        
-        // 5. 인기 있는 문제 검색 (풀이 수로 정렬)
-        params = {
-          query: `solved_by:!${handle}`,
-          page: page,
-          sort: "solved",
-          direction: "desc",
-          limit: 5
-        };
-        
-        searchResult = await searchProblems(params);
-      }
-    }
-    
-    // 최종적으로도 결과가 없는 경우
-    if (searchResult.error || !searchResult.items || searchResult.items.length === 0) {
+    // 결과가 없는 경우 기본 문제 검색
+    if (recommendations.length === 0) {
       return { 
         error: "현재 조건에 맞는 추천 문제를 찾을 수 없습니다.",
         userInfo
       };
     }
-    
-    // 6. 추천 문제 형식화
-    const recommendations = formatRecommendations(searchResult.items, userInfo);
     
     return {
       userInfo,
@@ -262,23 +215,208 @@ async function recommendProblems(handle, page = 1) {
 }
 
 /**
+ * 태그 기반 문제 추천
+ * @param {string} handle - 백준 ID
+ * @param {number} userTier - 사용자 티어
+ * @param {number} page - 페이지 번호
+ * @returns {Array} - 태그 기반 추천 문제 목록
+ */
+async function recommendTagBasedProblems(handle, userTier, page) {
+  console.log("태그 기반 문제 추천 시작...");
+  
+  // 태그 목록 (일반적인 태그)
+  const commonTags = ["implementation", "math", "string", "greedy", "dp", "bfs", "dfs"];
+  
+  // 사용자 티어에 맞는 문제 검색
+  const minLevel = Math.max(1, userTier - 2);
+  const maxLevel = Math.min(30, userTier + 1);
+  
+  // 검색 파라미터 구성
+  let params = {
+    query: `solved_by:!${handle} tier:${minLevel}..${maxLevel}`,
+    page: page,
+    sort: "solved", // 많이 풀린 순
+    direction: "desc",
+    limit: 5
+  };
+  
+  // 문제 검색
+  const searchResult = await searchProblems(params);
+  
+  // 결과가 없거나 오류가 있는 경우
+  if (searchResult.error || !searchResult.items || searchResult.items.length === 0) {
+    console.log('태그 기반 첫 번째 검색 실패, 다른 태그로 시도합니다...');
+    
+    // 인기 태그로 검색 시도
+    let allTagProblems = [];
+    
+    for (const tag of commonTags) {
+      params = {
+        query: `tag:${tag} solved_by:!${handle} tier:${minLevel}..${maxLevel}`,
+        page: 1,
+        sort: "solved",
+        direction: "desc",
+        limit: 3
+      };
+      
+      const tagResult = await searchProblems(params);
+      
+      if (!tagResult.error && tagResult.items && tagResult.items.length > 0) {
+        allTagProblems = [...allTagProblems, ...tagResult.items];
+        if (allTagProblems.length >= 5) break;
+      }
+    }
+    
+    if (allTagProblems.length > 0) {
+      // 태그 기반 추천 문제 형식화
+      const formatted = formatRecommendations(allTagProblems, { tier: userTier }, 85);
+      return formatted.slice(0, 2); // 최대 2개 반환
+    }
+    
+    return []; // 태그 기반 검색 실패
+  }
+  
+  // 태그 기반 추천 문제 형식화 (점수 높게)
+  const formatted = formatRecommendations(searchResult.items, { tier: userTier }, 85);
+  return formatted.slice(0, 2); // 최대 2개 반환
+}
+
+/**
+ * 인기도 기반 문제 추천
+ * @param {string} handle - 백준 ID
+ * @param {number} userTier - 사용자 티어
+ * @param {number} page - 페이지 번호
+ * @returns {Array} - 인기도 기반 추천 문제 목록
+ */
+async function recommendPopularityBasedProblems(handle, userTier, page) {
+  console.log("인기도 기반 문제 추천 시작...");
+  
+  // 인기 문제 목록 (브론즈 ~ 실버 단계에서 자주 풀리는 문제들)
+  const popularProblems = [
+    {"id": 2557, "title": "Hello World", "level": 1, "acceptedUserCount": 358000},  // 브론즈 5
+    {"id": 1000, "title": "A+B", "level": 1, "acceptedUserCount": 339000},          // 브론즈 5
+    {"id": 1001, "title": "A-B", "level": 1, "acceptedUserCount": 242000},          // 브론즈 5
+    {"id": 10998, "title": "A×B", "level": 1, "acceptedUserCount": 222000},         // 브론즈 5
+    {"id": 10869, "title": "사칙연산", "level": 1, "acceptedUserCount": 214000},    // 브론즈 5
+    {"id": 1008, "title": "A/B", "level": 2, "acceptedUserCount": 199000},          // 브론즈 4
+    {"id": 11654, "title": "아스키 코드", "level": 1, "acceptedUserCount": 195000}, // 브론즈 5
+    {"id": 10171, "title": "고양이", "level": 1, "acceptedUserCount": 188000},      // 브론즈 5
+    {"id": 2438, "title": "별 찍기 - 1", "level": 3, "acceptedUserCount": 185000},  // 브론즈 3
+    {"id": 10172, "title": "개", "level": 1, "acceptedUserCount": 181000},          // 브론즈 5
+    
+    // 실버 티어 문제들
+    {"id": 1874, "title": "스택 수열", "level": 7, "acceptedUserCount": 64000},     // 실버 2
+    {"id": 18352, "title": "특정 거리의 도시 찾기", "level": 9, "acceptedUserCount": 34000}, // 실버 4
+    {"id": 1697, "title": "숨바꼭질", "level": 8, "acceptedUserCount": 87000},      // 실버 3
+    {"id": 2178, "title": "미로 탐색", "level": 10, "acceptedUserCount": 77000},    // 실버 1
+    {"id": 1927, "title": "최소 힙", "level": 8, "acceptedUserCount": 56000},       // 실버 3
+    {"id": 1929, "title": "소수 구하기", "level": 8, "acceptedUserCount": 66000},   // 실버 3
+    {"id": 1260, "title": "DFS와 BFS", "level": 9, "acceptedUserCount": 95000},     // 실버 4
+    {"id": 1920, "title": "수 찾기", "level": 7, "acceptedUserCount": 83000},       // 실버 2
+    {"id": 11047, "title": "동전 0", "level": 10, "acceptedUserCount": 71000},      // 실버 1
+    {"id": 11399, "title": "ATM", "level": 10, "acceptedUserCount": 72000},         // 실버 1
+  ];
+  
+  // 풀지 않은 문제 확인
+  const params = {
+    query: `solved_by:${handle}`,
+    page: 1,
+    sort: "id",
+    direction: "asc",
+    limit: 100
+  };
+  
+  const solvedResult = await searchProblems(params);
+  const solvedIds = new Set();
+  
+  if (!solvedResult.error && solvedResult.items) {
+    solvedResult.items.forEach(problem => solvedIds.add(problem.problemId));
+  }
+  
+  // 사용자 티어에 맞는 문제 필터링
+  const minTier = Math.max(1, userTier - 2);
+  const maxTier = Math.min(30, userTier + 2);
+  
+  // 추천 문제 선택
+  let recommendedProblems = [];
+  
+  for (const problem of popularProblems) {
+    // 이미 푼 문제 건너뛰기
+    if (solvedIds.has(problem.id)) {
+      continue;
+    }
+    
+    // 티어 범위에 맞지 않는 문제 건너뛰기
+    if (problem.level < minTier || problem.level > maxTier) {
+      // 실버 사용자에게는 실버 문제 추천
+      if (userTier >= 6 && userTier <= 10 && problem.level >= 6 && problem.level <= 10) {
+        // 실버 범위 내 문제는 통과
+      } else if (userTier < 6 && problem.level <= 5) {
+        // 낮은 티어 사용자에게는 브론즈 문제 추천
+      } else {
+        continue;
+      }
+    }
+    
+    // 문제 정보 구성
+    recommendedProblems.push({
+      id: problem.id,
+      title: problem.title,
+      level: problem.level,
+      tierName: getTierNameKo(problem.level),
+      tierColor: getTierColor(problem.level),
+      tags: ["implementation"], // 기본 태그
+      acceptedUserCount: problem.acceptedUserCount,
+      score: 80 - Math.abs(userTier - problem.level) * 2
+    });
+    
+    if (recommendedProblems.length >= 3) {
+      break;
+    }
+  }
+  
+  // 인기도 기반 문제가 없는 경우 API 검색
+  if (recommendedProblems.length === 0) {
+    console.log('하드코딩된 인기 문제 검색 실패, API로 검색합니다...');
+    
+    const params = {
+      query: `solved_by:!${handle}`,
+      page: 1,
+      sort: "solved",
+      direction: "desc",
+      limit: 5
+    };
+    
+    const searchResult = await searchProblems(params);
+    
+    if (!searchResult.error && searchResult.items && searchResult.items.length > 0) {
+      // 인기도 기반 추천 문제 형식화
+      recommendedProblems = formatRecommendations(searchResult.items, { tier: userTier }, 75);
+    }
+  }
+  
+  return recommendedProblems.slice(0, 3); // 최대 3개 반환
+}
+
+/**
  * 추천 문제 형식화하기
  * @param {Array} problems - 문제 목록
  * @param {Object} userInfo - 사용자 정보
+ * @param {number} baseScore - 기본 점수
  * @returns {Array} - 형식화된 추천 문제 목록
  */
-function formatRecommendations(problems, userInfo) {
+function formatRecommendations(problems, userInfo, baseScore = 80) {
   return problems.map((problem, index) => ({
     id: problem.problemId,
     title: problem.titleKo,
     level: problem.level,
     tierName: getTierNameKo(problem.level),
     tierColor: getTierColor(problem.level),
-    tags: problem.tags.map(tag => tag.displayNames.find(n => n.language === "ko")?.name || tag.key),
+    tags: problem.tags?.map(tag => tag.displayNames?.find(n => n.language === "ko")?.name || tag.key) || ["구현"],
     acceptedUserCount: problem.acceptedUserCount,
     averageTries: problem.averageTries,
-    score: Math.round(90 - Math.abs(userInfo.tier - problem.level) * 2 + Math.random() * 10)
-  }));
+    score: Math.round(baseScore - Math.abs(userInfo.tier - problem.level) * 2 + Math.random() * 10)
+  })).sort((a, b) => b.score - a.score); // 점수 기준 내림차순 정렬
 }
 
 /**
@@ -313,10 +451,6 @@ function generateRecommendHTML(result) {
       <p>해결한 문제 수: ${userInfo.solvedCount}개</p>
       <p>페이지: ${page}</p>
     </div>
-    <div class='py-2 mb-4 bg-yellow-100 text-black rounded-md p-2'>
-      <p class='font-bold'>추천 방식: 티어 기반 추천</p>
-      <p>사용자의 티어에 맞는 문제를 추천합니다.</p>
-    </div>
   `;
   
   // 추천 결과가 없는 경우
@@ -325,16 +459,45 @@ function generateRecommendHTML(result) {
       <div class='py-4 text-black font-black bg-red-200 p-2 rounded-md'>현재 조건에 맞는 추천 문제를 찾을 수 없습니다.</div>
     `;
   } else {
+    // 추천 방식 설명
+    html += `
+      <div class='py-2 mb-4 bg-yellow-100 text-black rounded-md p-2'>
+        <p class='font-bold'>추천 방식: 태그 기반 + 인기도 기반</p>
+        <p>사용자의 티어에 맞는 문제와 인기 있는 문제를 추천합니다.</p>
+      </div>
+    `;
+    
+    // 태그 기반 추천과 인기도 기반 추천 수 계산
+    const tagBasedCount = recommendations.filter(p => p.recommendationType === "태그 기반").length;
+    const popularityBasedCount = recommendations.filter(p => p.recommendationType === "인기도 기반").length;
+    
+    // 설명 추가
+    html += `
+      <div class='p-2 mb-4 bg-gray-100 rounded-md text-black'>
+        <p class='font-bold'>추천 방법 상세 설명:</p>
+        <p>1️⃣ 태그 기반 (${tagBasedCount}문제): 사용자의 티어에 맞는 문제를 추천합니다.</p>
+        <p>2️⃣ 인기도 기반 (${popularityBasedCount}문제): 많은 사용자들이 푼 인기 있는 문제를 추천합니다.</p>
+      </div>
+    `;
+    
     // 각 문제 카드 생성
     recommendations.forEach((problem, index) => {
+      const recommendTypeClass = problem.recommendationType === "태그 기반" ? "bg-blue-50" : "bg-green-50";
+      const recommendTypeBadge = problem.recommendationType === "태그 기반" ? 
+        `<span class='inline-block px-2 py-0.5 bg-blue-500 text-white text-xs rounded-md'>태그 기반</span>` :
+        `<span class='inline-block px-2 py-0.5 bg-green-500 text-white text-xs rounded-md'>인기도 기반</span>`;
+      
       html += `
-        <div class='problem-card mb-4 p-4 rounded-lg bg-white shadow-md border border-gray-300'>
+        <div class='problem-card mb-4 p-4 rounded-lg bg-white shadow-md border border-gray-300 ${recommendTypeClass}'>
           <div class='flex justify-between items-start'>
             <h3 class='text-lg font-medium text-gray-800'>
               <span class='inline-block mr-2 px-2 py-1 rounded-md text-white text-sm font-medium' style='background-color: ${problem.tierColor};'>${problem.tierName}</span>
               ${index + 1}. ${problem.title} <span class='text-gray-600 font-normal'>#${problem.id}</span>
             </h3>
-            <span class='text-lg font-medium text-gray-700'>${problem.score}점</span>
+            <div class='flex flex-col items-end'>
+              <span class='text-lg font-medium text-gray-700'>${problem.score}점</span>
+              ${recommendTypeBadge}
+            </div>
           </div>
           
           <div class='mt-1 text-sm text-gray-600'>
