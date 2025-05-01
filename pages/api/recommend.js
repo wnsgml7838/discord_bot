@@ -89,9 +89,105 @@ export default async function handler(req, res) {
 
     // API 호출 로깅
     await logServerActivity('baekjoon_api_call', { handle, page: pageNum }, req);
-
-    console.log(`백준 문제 추천 시작: ${handle}, 페이지: ${pageNum}`);
     
+    // 스크립트 경로
+    const scriptPath = path.join(process.cwd(), 'bot', 'commands', 'baekjoon_recommender.py');
+    
+    console.log(`백준 문제 추천 시작: ${handle}, 페이지: ${pageNum}`);
+    console.log(`실행 경로: python ${scriptPath} ${handle} ${pageNum}`);
+
+    // Python 스크립트 실행
+    exec(`python ${scriptPath} ${handle} ${pageNum}`, {
+      timeout: 30000 // 30초 타임아웃
+    }, async (error, stdout, stderr) => {
+      if (error) {
+        console.error('백준 문제 추천 오류:', error.message);
+        console.error('STDERR:', stderr);
+        
+        // 오류 로깅
+        await logServerActivity('baekjoon_api_exec_error', { 
+          handle, 
+          page: pageNum,
+          error: error.message,
+          stderr
+        }, req);
+        
+        // 오류가 발생하면 예시 응답을 대신 반환 (오류 발생 표시와 함께)
+        const userTier = "정보 없음";
+        const result = generateExampleResponse(handle, pageNum, true);
+        
+        await logServerActivity('baekjoon_api_fallback', { 
+          handle, 
+          page: pageNum,
+          error: error.message
+        }, req);
+        
+        return res.status(200).json({ 
+          success: true,
+          is_fallback: true,
+          result: result,
+          userInfo: {
+            handle,
+            tier: userTier
+          },
+          page: pageNum,
+          error: error.message
+        });
+      }
+      
+      if (stderr) {
+        console.warn('백준 문제 추천 경고:', stderr);
+      }
+      
+      console.log('백준 문제 추천 완료');
+      
+      // stdout에서 HTML 결과 부분만 추출
+      // 시작 표시: <h2 class='text-3xl font-black text-black bg-yellow-200 p-2 rounded-md'>📋 추천 문제
+      // 또는 시작부터 끝까지의 출력이 HTML 결과일 수 있음
+      let result = stdout;
+      let noResults = false;
+      
+      // HTML 시작 부분을 찾습니다
+      const htmlStartIndex = stdout.indexOf("<h2 class='text-3xl font-black text-black bg-yellow-200 p-2 rounded-md'>📋 추천 문제");
+      
+      if (htmlStartIndex !== -1) {
+        // HTML 부분만 추출합니다
+        result = stdout.substring(htmlStartIndex);
+      } else if (stdout.includes("현재 조건에 맞는 추천 문제를 찾을 수 없습니다")) {
+        // 결과가 없는 경우 기본 메시지 생성
+        result = `<h2 class='text-3xl font-black text-black bg-yellow-200 p-2 rounded-md'>📋 추천 문제</h2>
+                  <div class='border-t-4 border-black my-3'></div>
+                  <div class='py-4 text-black font-black bg-red-200 p-2 rounded-md'>현재 조건에 맞는 추천 문제를 찾을 수 없습니다.</div>`;
+        noResults = true;
+      }
+      
+      // 사용자 정보 추출 (있는 경우)
+      let userTier = "정보 없음";
+      const tierMatch = stdout.match(/사용자 티어: (.+)/);
+      if (tierMatch && tierMatch[1]) {
+        userTier = tierMatch[1];
+      }
+      
+      // 결과 로깅
+      await logServerActivity('baekjoon_api_result', { 
+        handle, 
+        page: pageNum,
+        user_tier: userTier,
+        no_results: noResults
+      }, req);
+      
+      return res.status(200).json({ 
+        success: true, 
+        result: result,
+        userInfo: {
+          handle,
+          tier: userTier
+        },
+        page: pageNum
+      });
+    });
+    
+    /* 
     // Vercel 환경에서는 Python 스크립트 실행이 불가능하므로 하드코딩된 예시 응답 반환
     const userTier = "골드 4"; // 예시 티어
     
@@ -115,19 +211,6 @@ export default async function handler(req, res) {
       },
       page: pageNum
     });
-    
-    /* 원래 Python 스크립트 실행 코드는 Vercel 환경에서 작동하지 않아 주석 처리
-    // 스크립트 경로
-    const scriptPath = path.join(process.cwd(), 'bot', 'commands', 'baekjoon_recommender.py');
-    
-    console.log(`실행 경로: python ${scriptPath} ${handle} ${pageNum}`);
-
-    // Python 스크립트 실행
-    exec(`python ${scriptPath} ${handle} ${pageNum}`, {
-      timeout: 30000 // 30초 타임아웃
-    }, async (error, stdout, stderr) => {
-      // ... 원래 코드 ...
-    });
     */
   } catch (error) {
     console.error('백준 문제 추천 처리 중 예외 발생:', error);
@@ -149,9 +232,10 @@ export default async function handler(req, res) {
  * 예시 응답 HTML 생성 함수
  * @param {string} handle - 백준 ID
  * @param {number} page - 페이지 번호
+ * @param {boolean} isError - 오류 발생 여부
  * @returns {string} - HTML 응답
  */
-function generateExampleResponse(handle, page) {
+function generateExampleResponse(handle, page, isError = false) {
   // 예시 문제 데이터
   const exampleProblems = [
     {
@@ -245,12 +329,25 @@ function generateExampleResponse(handle, page) {
   let html = `
     <h2 class='text-3xl font-black text-black bg-yellow-200 p-2 rounded-md'>📋 추천 문제</h2>
     <div class='border-t-4 border-black my-3'></div>
+  `;
+  
+  // 오류 발생 시 알림 추가
+  if (isError) {
+    html += `
+    <div class='p-2 mb-4 bg-red-100 rounded-md text-black'>
+      <p class='font-bold mb-1'>⚠️ 오류 발생</p>
+      <p>Python 스크립트 실행 중 오류가 발생하여 예시 데이터를 표시합니다.</p>
+    </div>
+    `;
+  }
+  
+  html += `
     <div class='p-2 mb-4 bg-blue-100 rounded-md text-black'>
       <p class='font-bold mb-1'>사용자 정보:</p>
       <p>백준 ID: ${handle}</p>
-      <p>사용자 티어: 골드 4 (Vercel 환경 예시)</p>
+      <p>사용자 티어: ${isError ? "정보 없음" : "골드 4"} ${isError ? "" : "(Vercel 환경 예시)"}</p>
       <p>페이지: ${page}</p>
-      <p class='mt-2 text-xs text-gray-600'>※ Vercel 환경에서는 Python 스크립트를 실행할 수 없어 예시 데이터를 표시합니다.</p>
+      ${isError ? "" : "<p class='mt-2 text-xs text-gray-600'>※ Vercel 환경에서는 Python 스크립트를 실행할 수 없어 예시 데이터를 표시합니다.</p>"}
     </div>
     <div class='py-2 mb-4 bg-yellow-100 text-black rounded-md p-2'>
       <p class='font-bold'>추천 방식: 태그 기반 추천</p>
