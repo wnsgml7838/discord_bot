@@ -1,6 +1,7 @@
 const discord = require('discord.js');
 const { Octokit } = require('@octokit/rest');
 const path = require('path');
+const { recommendBaekjoonProblems } = require('./discord_bot_problem_recommender');
 
 // 환경 변수에서 토큰을 읽을 경우를 위한 dotenv 설정
 require('dotenv').config();
@@ -215,6 +216,33 @@ client.once('ready', () => {
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
+
+  // 백준 문제 추천 명령어 처리
+  if (message.content.startsWith('!백준추천') || message.content.startsWith('!문제추천')) {
+    const args = message.content.split(' ');
+    if (args.length < 2) {
+      message.reply('백준 아이디를 입력해주세요. 예시: `!백준추천 jjojo2025`');
+      return;
+    }
+
+    const handle = args[1].trim();
+    
+    try {
+      // 로딩 메시지
+      const loadingMessage = await message.reply('백준 문제를 추천하는 중입니다... (약 10-20초 소요)');
+      
+      // 백준 문제 추천 처리
+      const recommendation = await recommendBaekjoonProblems(handle);
+      
+      // 결과 메시지 전송
+      await loadingMessage.edit(recommendation);
+    } catch (error) {
+      console.error('백준 문제 추천 오류:', error);
+      message.reply('문제 추천 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    }
+    
+    return;
+  }
 
   if (message.attachments.size > 0) {
     for (const [, attachment] of message.attachments) {
