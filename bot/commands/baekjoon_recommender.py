@@ -12,10 +12,10 @@ import sys
 import time
 
 # API 엔드포인트
-SOLVED_API_BASE = "https://solved.ac/api/v3"
-USER_SOLVED_ENDPOINT = f"{SOLVED_API_BASE}/user/solved_problems"
-PROBLEM_DETAIL_ENDPOINT = f"{SOLVED_API_BASE}/problem/show"
-PROBLEM_SEARCH_ENDPOINT = f"{SOLVED_API_BASE}/search/problem"
+SOLVED_API_BASE = "https://solved.ac/api"
+USER_SOLVED_ENDPOINT = f"{SOLVED_API_BASE}/v3/search/problem" # 검색 API 사용
+PROBLEM_DETAIL_ENDPOINT = f"{SOLVED_API_BASE}/v3/problem/show"
+PROBLEM_SEARCH_ENDPOINT = f"{SOLVED_API_BASE}/v3/search/problem"
 BOJ_BASE_URL = "https://boj.kr"
 
 # 티어 매핑 (1~30 -> Bronze 5 ~ Ruby 1)
@@ -46,14 +46,36 @@ def rate_limited_request(url, params=None):
 
 # 사용자가 푼 문제 가져오기
 def get_solved_problems(handle):
-    params = {"handle": handle}
-    data = rate_limited_request(USER_SOLVED_ENDPOINT, params)
+    # solved_by 쿼리 파라미터 사용
+    params = {
+        "query": f"solved_by:{handle}",
+        "page": 1,
+        "sort": "id",
+        "direction": "asc",
+        "limit": 100
+    }
     
-    if data is None:
-        return []
+    solved_problems = []
+    page = 1
     
-    # 문제 ID 목록 반환
-    return [item["problemId"] for item in data["items"]]
+    while True:
+        params["page"] = page
+        data = rate_limited_request(USER_SOLVED_ENDPOINT, params)
+        
+        if data is None or "items" not in data or len(data["items"]) == 0:
+            break
+        
+        # 문제 ID 추출
+        for item in data["items"]:
+            solved_problems.append(item["problemId"])
+        
+        # 더 이상 데이터가 없거나 최대 페이지에 도달하면 중단
+        if len(data["items"]) < params["limit"] or page >= 10:  # 최대 1000개 문제 (10 페이지)
+            break
+        
+        page += 1
+    
+    return solved_problems
 
 # 문제 상세 정보 가져오기
 def get_problem_details(problem_id):
