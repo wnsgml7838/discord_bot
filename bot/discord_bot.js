@@ -20,7 +20,8 @@ const intents = new discord.IntentsBitField();
 intents.add(
   discord.IntentsBitField.Flags.Guilds,
   discord.IntentsBitField.Flags.GuildMessages,
-  discord.IntentsBitField.Flags.MessageContent
+  discord.IntentsBitField.Flags.MessageContent,
+  discord.IntentsBitField.Flags.DirectMessages // DM 메시지 수신 권한 추가
 );
 
 const client = new discord.Client({ intents });
@@ -216,6 +217,10 @@ client.once('ready', () => {
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
+  
+  // 로그 출력 (서버 메시지인지 DM인지 구분)
+  const messageType = message.guild ? '서버 메시지' : 'DM';
+  console.log(`메시지 수신 [${messageType}]: ${message.content}`);
 
   // 백준 문제 추천 명령어 처리
   if (message.content.startsWith('!백준추천') || message.content.startsWith('!문제추천')) {
@@ -244,7 +249,14 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
-  if (message.attachments.size > 0) {
+  // 서버 채팅이 아닌 DM의 경우에는 이미지 저장을 건너뜁니다
+  if (!message.guild && message.attachments.size > 0) {
+    message.reply('DM에서는 이미지 저장 기능을 사용할 수 없습니다. 서버 채팅에서 이미지를 공유해주세요.');
+    return;
+  }
+
+  // 기존 이미지 처리 코드는 서버 채팅인 경우에만 실행
+  if (message.guild && message.attachments.size > 0) {
     for (const [, attachment] of message.attachments) {
       if (attachment.contentType && attachment.contentType.startsWith("image/")) {
         const nickname = message.author.username;
