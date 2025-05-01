@@ -193,23 +193,61 @@ async function recommendProblems(handle, page = 1) {
       maxLevel = 10;
     }
     
-    // 3. 검색 파라미터 구성
-    const params = {
+    // 3. 먼저 사용자가 풀지 않은 문제 중 적절한 티어의 문제 검색
+    let params = {
       query: `solved_by:!${handle} tier:${minLevel}..${maxLevel}`,
       page: page,
       sort: "random",
       direction: "asc",
-      limit: 3
+      limit: 5
     };
     
-    // 4. 문제 검색
-    const searchResult = await searchProblems(params);
+    let searchResult = await searchProblems(params);
     
-    if (searchResult.error) {
-      return { error: searchResult.error };
+    // 결과가 없거나 오류가 있는 경우
+    if (searchResult.error || !searchResult.items || searchResult.items.length === 0) {
+      console.log('첫 번째 검색 실패, 더 넓은 범위로 검색합니다...');
+      
+      // 4. 티어 범위를 더 넓게 설정
+      minLevel = Math.max(1, userInfo.tier - 10);
+      maxLevel = Math.min(30, userInfo.tier + 10);
+      
+      params = {
+        query: `solved_by:!${handle} tier:${minLevel}..${maxLevel}`,
+        page: page,
+        sort: "random",
+        direction: "asc",
+        limit: 5
+      };
+      
+      searchResult = await searchProblems(params);
+      
+      // 여전히 결과가 없는 경우
+      if (searchResult.error || !searchResult.items || searchResult.items.length === 0) {
+        console.log('두 번째 검색 실패, 인기 있는 문제를 검색합니다...');
+        
+        // 5. 인기 있는 문제 검색 (풀이 수로 정렬)
+        params = {
+          query: `solved_by:!${handle}`,
+          page: page,
+          sort: "solved",
+          direction: "desc",
+          limit: 5
+        };
+        
+        searchResult = await searchProblems(params);
+      }
     }
     
-    // 5. 추천 문제 형식화
+    // 최종적으로도 결과가 없는 경우
+    if (searchResult.error || !searchResult.items || searchResult.items.length === 0) {
+      return { 
+        error: "현재 조건에 맞는 추천 문제를 찾을 수 없습니다.",
+        userInfo
+      };
+    }
+    
+    // 6. 추천 문제 형식화
     const recommendations = formatRecommendations(searchResult.items, userInfo);
     
     return {
