@@ -278,24 +278,39 @@ def recommend_problems(handle, page=1):
     average_tier = calculate_average_tier(user_info, all_tag_tier)
     print(f"최종 추천 티어: {get_tier_name_ko(average_tier)}")
     
-    # 5. 태그 기반 문제 추천
-    tag_based_problems = recommend_tag_based_problems(average_tier, solved_problems, solved_problems_with_details, page)
-    print(f"태그 기반 추천 문제 수: {len(tag_based_problems)}")
+    total_recommendations_needed = 5  # 총 추천할 문제 수
     
-    # 6. 인기도 기반 문제 추천
-    # 태그 기반 문제가 없으면 인기도 기반 문제를 5개로 늘림
-    popularity_count = 5 if len(tag_based_problems) == 0 else 3
+    # 5. 태그 기반 문제 추천 (최대 2개)
+    tag_based_problems = recommend_tag_based_problems(average_tier, solved_problems, solved_problems_with_details, page)
+    tag_count = len(tag_based_problems)
+    print(f"태그 기반 추천 문제 수: {tag_count}")
+    
+    # 6. 인기도 기반 문제 추천 (나머지)
+    # 태그 기반 문제 수에 따라 인기도 문제 개수 결정 (항상 총 5개가 되도록)
+    popularity_count = total_recommendations_needed - tag_count
+    print(f"인기도 기반 문제 추천 수 결정: {popularity_count}개")
+    
     popularity_based_problems = recommend_popularity_based_problems(average_tier, solved_problems, solved_problems_with_details, page, popularity_count)
-    print(f"인기도 기반 추천 문제 수: {len(popularity_based_problems)}")
+    popularity_count = len(popularity_based_problems)
+    print(f"인기도 기반 추천 문제 수: {popularity_count}")
     
     # 7. 최종 추천 문제 목록 생성
     recommended_problems = tag_based_problems + popularity_based_problems
     
     # 문제를 티어 기준으로 정렬 (오름차순 - 낮은 티어/쉬운 문제가 먼저 나오도록)
-    recommended_problems.sort(key=lambda x: int(x["level"]))
+    # 문자열 레벨을 정수로 변환하여 정렬
+    for problem in recommended_problems:
+        problem["level_int"] = int(problem["level"])
+        
+    recommended_problems.sort(key=lambda x: x["level_int"])
     
     # 8. 결과 출력
     result = format_recommendations(recommended_problems, average_tier)
+    
+    # 최종 추천 수가 5개 미만일 경우 추가 메시지
+    total_recommended = len(recommended_problems)
+    if total_recommended < total_recommendations_needed:
+        print(f"경고: 추천 문제가 {total_recommended}개로, 목표인 {total_recommendations_needed}개보다 적습니다.")
     
     # 9. 안내 메시지 추가
     tag_count = len(tag_based_problems)
