@@ -3,8 +3,36 @@
  * 백준 문제를 추천하는 자바스크립트 구현
  */
 
-const fetch = require('node-fetch');
-const cheerio = require('cheerio');
+// node-fetch v3는 ESM 모듈이므로 CommonJS에서 직접 사용 불가능
+// 크로스 버전 호환을 위해 동적 import 처리
+let fetch;
+(async () => {
+  try {
+    const module = await import('node-fetch');
+    fetch = module.default;
+  } catch (error) {
+    // fallback - node-fetch@2.x 버전이 설치되어 있는 경우
+    try {
+      fetch = require('node-fetch');
+    } catch (err) {
+      console.error('node-fetch 모듈을 가져올 수 없습니다:', err);
+      // polyfill 또는 기본 fetch 함수 (Node.js 18 이상)
+      fetch = global.fetch || (() => {
+        throw new Error('fetch 함수를 사용할 수 없습니다. Node.js 18 이상을 사용하거나 node-fetch를 설치하세요.');
+      });
+    }
+  }
+})();
+
+// cheerio 로드
+let cheerio;
+try {
+  cheerio = require('cheerio');
+} catch (error) {
+  console.warn('cheerio 모듈을 가져올 수 없습니다:', error);
+  // cheerio가 없어도 기본 동작은 가능하도록 빈 객체 제공
+  cheerio = { load: () => ({ find: () => ({ text: () => '' }) }) };
+}
 
 /**
  * 백준 아이디로 문제 추천 
@@ -13,6 +41,11 @@ const cheerio = require('cheerio');
  * @returns {Promise<string>} - 추천 결과 메시지 (HTML 형식)
  */
 async function recommendBaekjoonProblems(handle, page = 1) {
+  // 문자열로 들어온 페이지 번호를 정수로 변환
+  if (typeof page === 'string') {
+    page = parseInt(page) || 1;
+  }
+  
   console.log(`🔍 '${handle}'님의 백준 문제 추천을 시작합니다... (페이지: ${page})`);
   
   try {

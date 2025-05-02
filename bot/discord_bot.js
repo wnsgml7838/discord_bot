@@ -355,8 +355,8 @@ client.on('messageCreate', async message => {
       
       // 추천 모드 확인
       const handle = args[0];
-      const mode = args[1] || 'personalized';
-      console.log(`백준 추천 모드: ${mode}`);
+      const page = parseInt(args[1]) || 1; // 페이지 번호 (숫자로 변환)
+      console.log(`백준 추천 페이지: ${page}`);
       
       // 사용자에게 로딩 메시지 표시
       const loadingMessage = await message.reply('백준 문제를 추천하는 중입니다... (약 10-20초 소요)');
@@ -364,7 +364,7 @@ client.on('messageCreate', async message => {
       try {
         // 백준 문제 추천 처리
         console.log('백준 추천 함수 호출 중...');
-        const result = await recommendBaekjoonProblems(handle, mode);
+        const result = await recommendBaekjoonProblems(handle, page);
         console.log('백준 추천 완료, 결과 전송 중...');
         
         // 로딩 메시지 제거
@@ -391,7 +391,7 @@ client.on('messageCreate', async message => {
           activityType: 'baekjoon_recommend',
           details: {
             handle,
-            mode,
+            page,
             success: true
           }
         });
@@ -414,7 +414,7 @@ client.on('messageCreate', async message => {
           context: {
             command: '백준추천',
             handle,
-            mode
+            page
           }
         });
       }
