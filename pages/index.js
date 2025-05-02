@@ -30,7 +30,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [webhookStatus, setWebhookStatus] = useState(null);
   const [statsData, setStatsData] = useState({
     totalSubmissions: 0,
     averagePerUser: 0,
@@ -53,10 +52,6 @@ export default function Home() {
     // Discord Webhook 테스트
     const testWebhook = async () => {
       try {
-        console.log('Discord Webhook 테스트 시작...');
-        console.log('NEXT_PUBLIC_DISCORD_WEBHOOK_URL 환경 변수 확인:', 
-          process.env.NEXT_PUBLIC_DISCORD_WEBHOOK_URL ? '설정됨 ✅' : '설정되지 않음 ❌');
-        
         // 직접 로깅 시도
         if (process.env.NEXT_PUBLIC_DISCORD_WEBHOOK_URL) {
           await logDirectToDiscord('page_load', null, 'index', {
@@ -64,14 +59,11 @@ export default function Home() {
             timestamp: new Date().toISOString(),
             message: '메인 페이지 로드 테스트'
           });
-          setWebhookStatus('성공: Discord 웹훅이 정상적으로 작동합니다.');
           console.log('Discord 웹훅 테스트 성공');
         } else {
-          setWebhookStatus('오류: NEXT_PUBLIC_DISCORD_WEBHOOK_URL이 설정되지 않았습니다.');
-          console.error('웹훅 URL이 설정되지 않음');
+          console.warn('웹훅 URL이 설정되지 않음');
         }
       } catch (err) {
-        setWebhookStatus(`오류: ${err.message}`);
         console.error('Discord 웹훅 테스트 실패:', err);
       }
     };
@@ -209,15 +201,6 @@ export default function Home() {
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-center mb-2">YEARDREAM 5th ALGORITHM </h1>
         <p className="text-center text-gray-600">스터디 참여 현황 및 데이터 분석</p>
-        
-        {/* Discord Webhook 상태 표시 (개발 중일 때만 표시, 나중에 제거) */}
-        {webhookStatus && (
-          <div className={`mt-2 text-center text-sm p-2 rounded ${
-            webhookStatus.startsWith('성공') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-          }`}>
-            {webhookStatus}
-          </div>
-        )}
       </header>
 
       <div className="flex justify-between items-center mb-6">
