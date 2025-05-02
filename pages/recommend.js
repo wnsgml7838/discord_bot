@@ -50,7 +50,8 @@ export default function RecommendPage() {
     setError(null);
     
     try {
-      const response = await fetch('/api/recommend', {
+      // Discord 봇의 백준 문제 추천 API 사용
+      const response = await fetch('/api/recommend-discord', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -71,18 +72,52 @@ export default function RecommendPage() {
       logUserActivity('baekjoon_recommend_result', null, {
         handle: handle, 
         page: page,
-        success: true
+        success: true,
+        api: 'discord_bot' // Discord 봇 API를 사용했음을 표시
       });
     } catch (error) {
       console.error('API 요청 오류:', error);
-      setError(error.message || '문제 추천 중 오류가 발생했습니다.');
       
-      // 오류 로깅
-      logUserActivity('baekjoon_recommend_error', null, {
-        handle: handle,
-        page: page,
-        error: error.message
-      });
+      // Discord 봇 API 실패 시 기존 API 시도
+      try {
+        console.log('Discord 봇 API 실패, 기존 API 시도');
+        
+        const fallbackResponse = await fetch('/api/recommend', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ handle, page }),
+        });
+        
+        const fallbackData = await fallbackResponse.json();
+        
+        if (!fallbackResponse.ok) {
+          throw new Error(fallbackData.error || '문제 추천에 실패했습니다.');
+        }
+        
+        setResult(fallbackData.result);
+        setCurrentPage(page);
+        
+        // 폴백 결과 로깅
+        logUserActivity('baekjoon_recommend_fallback_result', null, {
+          handle: handle, 
+          page: page,
+          success: true,
+          api: 'fallback' // 폴백 API를 사용했음을 표시
+        });
+      } catch (fallbackError) {
+        console.error('폴백 API 요청 오류:', fallbackError);
+        setError(fallbackError.message || error.message || '문제 추천 중 오류가 발생했습니다.');
+        
+        // 오류 로깅
+        logUserActivity('baekjoon_recommend_error', null, {
+          handle: handle,
+          page: page,
+          error: fallbackError.message || error.message,
+          api_attempts: ['discord_bot', 'fallback']
+        });
+      }
     } finally {
       setLoading(false);
     }
