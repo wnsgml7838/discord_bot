@@ -233,11 +233,6 @@ def calculate_average_tier(user_info, tag_tier):
         print(f"사용자 요청에 따라 실버4(9)로 고정합니다. (원래 티어: {get_tier_name_ko(user_tier)})")
         return 9  # 실버 4
     
-    # 특수 사용자 처리: joonhee7838 사용자는 항상 실버 4로 고정
-    if user_info.get("handle", "").lower() == "joonhee7838":
-        print(f"사용자 'joonhee7838'의 티어를 실버4(9)로 고정합니다. (원래 티어: {get_tier_name_ko(user_tier)})")
-        return 9  # 실버 4
-    
     # 사용자 티어를 그대로 반환 (태그 티어 무시)
     print(f"사용자 티어({get_tier_name_ko(user_tier)})를 최종 추천 티어로 사용합니다.")
     return user_tier
