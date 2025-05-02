@@ -292,7 +292,7 @@ def recommend_problems(handle, page=1):
     recommended_problems = tag_based_problems + popularity_based_problems
     
     # 문제를 티어 기준으로 정렬 (오름차순 - 낮은 티어/쉬운 문제가 먼저 나오도록)
-    recommended_problems.sort(key=lambda x: x["level"])
+    recommended_problems.sort(key=lambda x: int(x["level"]))
     
     # 8. 결과 출력
     result = format_recommendations(recommended_problems, average_tier)
@@ -358,7 +358,7 @@ def recommend_tag_based_problems(average_tier, solved_problems, solved_problems_
     tier_range = f"{min_tier}..{max_tier}"
     
     # 페이지 오프셋 계산 - 페이지마다 다른 문제가 나오도록 함
-    offset = (page - 1) * 10
+    offset = (page - 1) * 5
     
     # 각 태그에 대해 문제 검색
     all_tag_problems = []
@@ -452,7 +452,7 @@ def search_backup_tag_problems(average_tier, solved_problems_set, page=1):
     tier_range = f"{min_tier}..{max_tier}"
     
     # 페이지 오프셋 계산
-    offset = (page - 1) * 10
+    offset = (page - 1) * 5
     
     # 각 태그에 대해 문제 검색
     all_problems = []
@@ -522,7 +522,7 @@ def search_backup_tag_problems(average_tier, solved_problems_set, page=1):
 # 인기도 기반 문제 추천 함수 수정 - offset 추가로 페이지 기능 강화
 def recommend_popularity_based_problems(average_tier, solved_problems, solved_problems_with_details, page=1, count=3):
     """인기도(푼 사람이 많은 순) 기준으로 문제를 추천합니다."""
-    print(f"인기도 기반 문제 추천 시작... (페이지: {page}, 추천 개수: {count})")
+    print(f"인기도 기반 문제 추천 시작... (페이지: {page}, 요청 개수: {count})")
     
     # solved_problems를 문자열과 정수 모두 포함하는 집합으로 변환
     solved_problems_set = set()
@@ -543,7 +543,7 @@ def recommend_popularity_based_problems(average_tier, solved_problems, solved_pr
     tier_range = f"{min_tier}..{max_tier}"
     
     # 페이지 오프셋 계산 - 페이지마다 다른 문제가 나오도록 함
-    offset = (page - 1) * 10
+    offset = (page - 1) * count * 2
     
     # 인기도 기준 쿼리 생성
     popularity_query = f"*l{tier_range} *o500.."  # 최소 500명 이상이 푼 문제
@@ -561,7 +561,7 @@ def recommend_popularity_based_problems(average_tier, solved_problems, solved_pr
     
     # 검색 결과 처리
     if not data or "items" not in data or len(data["items"]) == 0:
-        print("인기도 문제 검색 실패")
+        print("인기도 문제 검색 실패, 기본 문제로 대체합니다")
         return search_common_problems(solved_problems_set, page)
         
     print(f"인기도 문제 검색에서 {len(data['items'])}개 문제 찾음")
@@ -572,7 +572,7 @@ def recommend_popularity_based_problems(average_tier, solved_problems, solved_pr
         problem_id = str(item["problemId"])
         
         # 이미 푼 문제인지 확인
-        if problem_id in solved_problems_set or int(problem_id) in solved_problems_set:
+        if problem_id in solved_problems_set:
             continue
             
         # 언레이티드 문제 건너뛰기
@@ -612,7 +612,7 @@ def recommend_popularity_based_problems(average_tier, solved_problems, solved_pr
         filtered_problems.append(problem)
         print(f"- 추가됨: #{problem_id} [{get_tier_name_ko(item['level'])}] {item['titleKo']} (푼 사람: {solved_count}명)")
         
-        if len(filtered_problems) >= count + 5:  # 여유있게 몇 개 더 가져옴
+        if len(filtered_problems) >= count * 2:  # 여유있게 몇 개 더 가져옴
             break
     
     # 인기도(푼 사람 수) 기준 정렬
@@ -625,9 +625,11 @@ def recommend_popularity_based_problems(average_tier, solved_problems, solved_pr
     # 인기도 기반 문제가 없는 경우 기본 문제 검색
     if not filtered_problems:
         print("인기도 기반 문제를 찾을 수 없어 기본 문제 검색으로 전환합니다.")
-        return search_common_problems(solved_problems_set, page)
+        common_problems = search_common_problems(solved_problems_set, page)
+        # 요청된 개수만큼만 반환
+        return common_problems[:count]
     
-    # 요청된 개수만큼 반환 (중요: 원래 요청된 count 개수만큼만 반환)
+    # 요청된 개수만큼 정확히 반환
     result = filtered_problems[:count]
     print(f"최종 인기도 기반 추천 문제 수: {len(result)}")
     return result
@@ -699,30 +701,48 @@ def search_common_problems(solved_problems_set, page=1):
     """많은 사람들이 푸는 기본 문제를 추천합니다."""
     print(f"기본 문제 추천 시작... (페이지: {page})")
     
+    # 페이지에 따라 다른 문제 제공
+    page_offset = (page - 1) % 4  # 4개의 페이지 주기로 반복
+    
     # 자주 풀리는 기본 문제 ID 목록
-    common_problems = [
-        {"id": "2557", "title": "Hello World", "level": 1},   # 브론즈 5, Hello World 출력
-        {"id": "1000", "title": "A+B", "level": 1},           # 브론즈 5, 두 정수 A+B
-        {"id": "1001", "title": "A-B", "level": 1},           # 브론즈 5, 두 정수 A-B
-        {"id": "10998", "title": "A×B", "level": 1},          # 브론즈 5, 두 정수 A×B
-        {"id": "1008", "title": "A/B", "level": 2},           # 브론즈 4, 두 정수 A/B
-        {"id": "10869", "title": "사칙연산", "level": 1},     # 브론즈 5, 사칙연산
-        {"id": "9498", "title": "시험 성적", "level": 4},     # 브론즈 2, 시험 성적 평가
-        {"id": "2753", "title": "윤년", "level": 4},          # 브론즈 2, 윤년 계산
-        {"id": "2884", "title": "알람 시계", "level": 3},     # 브론즈 3, 알람 시계
-        {"id": "1330", "title": "두 수 비교하기", "level": 1}, # 브론즈 5, 두 수 비교
-        {"id": "2741", "title": "N 찍기", "level": 3},        # 브론즈 3, 1부터 N까지 출력
-        {"id": "2742", "title": "기찍 N", "level": 3},        # 브론즈 3, N부터 1까지 출력
-        {"id": "15552", "title": "빠른 A+B", "level": 4},     # 브론즈 2, 빠른 입출력
-        {"id": "10950", "title": "A+B - 3", "level": 3},      # 브론즈 3, 여러 테스트 케이스
-        {"id": "10951", "title": "A+B - 4", "level": 3},      # 브론즈 3, EOF까지 입력
-        {"id": "2438", "title": "별 찍기 - 1", "level": 3},   # 브론즈 3, 별 패턴
-        {"id": "2439", "title": "별 찍기 - 2", "level": 3},   # 브론즈 3, 오른쪽 정렬 별
-        {"id": "10952", "title": "A+B - 5", "level": 3},      # 브론즈 3, 0 0 종료 조건
-        {"id": "2562", "title": "최댓값", "level": 3},        # 브론즈 3, 최댓값과 위치
-        {"id": "3052", "title": "나머지", "level": 4},        # 브론즈 2, 서로 다른 나머지
+    common_problems_sets = [
+        # 페이지 1의 문제들
+        [
+            {"id": "2557", "title": "Hello World", "level": 1},   # 브론즈 5
+            {"id": "1000", "title": "A+B", "level": 1},           # 브론즈 5
+            {"id": "1001", "title": "A-B", "level": 1},           # 브론즈 5
+            {"id": "10998", "title": "A×B", "level": 1},          # 브론즈 5
+            {"id": "1008", "title": "A/B", "level": 2},           # 브론즈 4
+        ],
+        # 페이지 2의 문제들
+        [
+            {"id": "10869", "title": "사칙연산", "level": 1},     # 브론즈 5
+            {"id": "9498", "title": "시험 성적", "level": 4},     # 브론즈 2
+            {"id": "2753", "title": "윤년", "level": 4},          # 브론즈 2
+            {"id": "2884", "title": "알람 시계", "level": 3},     # 브론즈 3
+            {"id": "1330", "title": "두 수 비교하기", "level": 1}, # 브론즈 5
+        ],
+        # 페이지 3의 문제들
+        [
+            {"id": "2741", "title": "N 찍기", "level": 3},        # 브론즈 3
+            {"id": "2742", "title": "기찍 N", "level": 3},        # 브론즈 3
+            {"id": "15552", "title": "빠른 A+B", "level": 4},     # 브론즈 2
+            {"id": "10950", "title": "A+B - 3", "level": 3},      # 브론즈 3
+            {"id": "10951", "title": "A+B - 4", "level": 3},      # 브론즈 3
+        ],
+        # 페이지 4의 문제들
+        [
+            {"id": "2438", "title": "별 찍기 - 1", "level": 3},   # 브론즈 3
+            {"id": "2439", "title": "별 찍기 - 2", "level": 3},   # 브론즈 3
+            {"id": "10952", "title": "A+B - 5", "level": 3},      # 브론즈 3
+            {"id": "2562", "title": "최댓값", "level": 3},        # 브론즈 3
+            {"id": "3052", "title": "나머지", "level": 4},        # 브론즈 2
+        ]
     ]
 
+    # 현재 페이지에 해당하는 문제 세트 선택
+    common_problems = common_problems_sets[page_offset]
+    
     # 사용자가 풀지 않은 문제 필터링
     filtered_problems = []
     
@@ -752,11 +772,9 @@ def search_common_problems(solved_problems_set, page=1):
             "recommendation_type": "인기도 기반"
         }
         filtered_problems.append(problem)
-        if len(filtered_problems) >= 5:  # 최대 5개로 증가
-            break
     
     print(f"기본 문제 추천 {len(filtered_problems)}개 찾음")
-    for i, prob in enumerate(filtered_problems[:5], 1):
+    for i, prob in enumerate(filtered_problems, 1):
         print(f"- 기본 문제 추천 {i}: #{prob['id']} [{get_tier_name_ko(prob['level'])}] {prob['title']}")
     
     # 인기 문제 중에서도 풀린 것이 없다면 가장 기본적인 Hello World 문제 추천
@@ -778,7 +796,7 @@ def search_common_problems(solved_problems_set, page=1):
         }
         return [problem]
         
-    return filtered_problems[:5]
+    return filtered_problems
 
 # 추천 결과 형식화 함수
 def format_recommendations(recommendations, average_tier):
