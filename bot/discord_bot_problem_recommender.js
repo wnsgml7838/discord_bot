@@ -110,16 +110,20 @@ async function recommendBaekjoonProblems(handle, page = 1) {
       
       // 이미 추천된 문제 ID 목록 (제외할 목록)
       const excludedProblemIds = new Set([
-        ...solvedProblems, // 이미 해결한 문제
-        ...recommendedProblems.map(p => parseInt(p.id)) // 이미 추천된 문제
+        ...solvedProblems.map(id => +id), // 이미 해결한 문제 (숫자형으로 변환)
+        ...recommendedProblems.map(p => +p.id) // 이미 추천된 문제 (숫자형으로 변환)
       ]);
+      
+      console.log(`제외할 문제 ID 수: ${excludedProblemIds.size}`);
       
       // 다음 페이지부터 추가 문제 검색
       let additionalPage = page + 1;
       let additionalProblems = [];
       
-      // 필요한 개수를 채울 때까지 최대 3페이지까지 추가 검색
-      while (additionalProblems.length < additionalCount && additionalPage < page + 4) {
+      // 필요한 개수를 채울 때까지 최대 5페이지까지 추가 검색 (이전에는 3페이지)
+      while (additionalProblems.length < additionalCount && additionalPage < page + 6) {
+        console.log(`추가 문제 검색 중: 페이지 ${additionalPage}, 현재까지 ${additionalProblems.length}개 추가됨`);
+        
         const addedProblems = await recommendAdditionalPopularityProblems(
           averageTier, 
           excludedProblemIds, 
@@ -127,8 +131,11 @@ async function recommendBaekjoonProblems(handle, page = 1) {
           additionalCount
         );
         
+        console.log(`페이지 ${additionalPage}에서 ${addedProblems.length}개 문제 추가 발견`);
+        
         if (addedProblems.length === 0) {
           // 더 이상 추천할 문제가 없으면 중단
+          console.log(`페이지 ${additionalPage}에서 더 이상 추천할 문제가 없어 검색 중단`);
           break;
         }
         
@@ -139,6 +146,9 @@ async function recommendBaekjoonProblems(handle, page = 1) {
       }
       
       console.log(`추가 인기도 기반 추천 문제 수: ${additionalProblems.length}`);
+      if (additionalProblems.length > 0) {
+        console.log(`추가된 문제 ID: ${additionalProblems.map(p => p.id).join(', ')}`);
+      }
       
       // 추가 문제 병합
       recommendedProblems = [...recommendedProblems, ...additionalProblems];
@@ -548,23 +558,52 @@ async function recommendAdditionalPopularityProblems(targetTier, excludedProblem
       return [];
     }
     
-    // 목표 티어 범위 설정 (±4, 더 넓은 범위로 검색)
-    const minTier = Math.max(1, targetTier - 4);
-    const maxTier = Math.min(30, targetTier + 4);
+    // 목표 티어 범위 설정 (±6, 더 넓은 범위로 검색)
+    const minTier = Math.max(1, targetTier - 6);
+    const maxTier = Math.min(30, targetTier + 6);
     
     // 인기도 기반 문제 검색
     const tierRange = `*${minTier}..${maxTier}`;
-    const popularProblemResponse = await fetch(`https://solved.ac/api/v3/search/problem?query=${tierRange}+solvable:true&sort=solved&direction=desc&page=${page}`);
+    const apiUrl = `https://solved.ac/api/v3/search/problem?query=${tierRange}+solvable:true&sort=solved&direction=desc&page=${page}`;
+    
+    console.log(`추가 문제 API 호출: ${apiUrl}`);
+    
+    const popularProblemResponse = await fetch(apiUrl);
     
     if (!popularProblemResponse.ok) {
-      return [];
+      console.error(`API 응답 오류: ${popularProblemResponse.status} ${popularProblemResponse.statusText}`);
+      // 일반 검색 실패 시 랜덤 문제 검색으로 폴백
+      return await recommendRandomProblems(targetTier, excludedProblemIds, count);
     }
     
     const popularProblemData = await popularProblemResponse.json();
+    console.log(`API 응답: 총 ${popularProblemData.count}개 문제 중 ${popularProblemData.items.length}개 수신`);
+    
+    // API가 비어있는 응답을 반환한 경우
+    if (!popularProblemData.items || popularProblemData.items.length === 0) {
+      console.log('API가 문제 목록을 반환하지 않았습니다. 랜덤 문제 추천으로 전환합니다.');
+      return await recommendRandomProblems(targetTier, excludedProblemIds, count);
+    }
+    
+    // 응답에서 가져온 문제 ID 목록 로깅
+    const problemIds = popularProblemData.items.map(p => p.problemId);
+    console.log(`응답으로 받은 문제 ID 목록: ${problemIds.join(', ')}`);
+    
+    // 제외된 문제 ID 확인
+    const excludedIds = problemIds.filter(id => excludedProblemIds.has(id));
+    if (excludedIds.length > 0) {
+      console.log(`제외된 문제 ID: ${excludedIds.join(', ')}`);
+    }
     
     // 이미 해결했거나 이미 추천된 문제 제외
     const recommendedProblems = popularProblemData.items
-      .filter(problem => !excludedProblemIds.has(problem.problemId))
+      .filter(problem => {
+        const isExcluded = excludedProblemIds.has(problem.problemId);
+        if (isExcluded) {
+          console.log(`문제 ${problem.problemId} 제외됨: 이미 해결했거나 추천됨`);
+        }
+        return !isExcluded;
+      })
       .slice(0, count)
       .map(problem => ({
         id: problem.problemId.toString(),
@@ -577,9 +616,75 @@ async function recommendAdditionalPopularityProblems(targetTier, excludedProblem
         averageTries: problem.averageTries
       }));
     
+    console.log(`추가 문제 추천 결과: ${recommendedProblems.length}개 문제 추천`);
+    
+    // 추천된 문제가 없는 경우 랜덤 문제 추천 시도
+    if (recommendedProblems.length === 0) {
+      console.log('인기도 기반 추천에서 문제를 찾지 못했습니다. 랜덤 문제 추천으로 전환합니다.');
+      return await recommendRandomProblems(targetTier, excludedProblemIds, count);
+    }
+    
     return recommendedProblems;
   } catch (error) {
     console.error("추가 인기도 기반 문제 추천 실패:", error);
+    // 오류 발생 시 랜덤 문제 추천으로 폴백
+    return await recommendRandomProblems(targetTier, excludedProblemIds, count);
+  }
+}
+
+/**
+ * 랜덤 문제 추천 (마지막 대안)
+ * @param {number} targetTier - 목표 티어
+ * @param {Set} excludedProblemIds - 제외할 문제 ID 목록
+ * @param {number} count - 필요한 문제 수
+ * @returns {Promise<Array>} - 추천 문제 배열
+ */
+async function recommendRandomProblems(targetTier, excludedProblemIds, count) {
+  try {
+    console.log(`랜덤 문제 추천 시작: 목표 티어 ${targetTier}, 필요 개수 ${count}`);
+    
+    // 티어 범위 크게 설정 (±8)
+    const minTier = Math.max(1, targetTier - 8);
+    const maxTier = Math.min(30, targetTier + 8);
+    const tierRange = `*${minTier}..${maxTier}`;
+    
+    // 랜덤 정렬로 문제 가져오기
+    const apiUrl = `https://solved.ac/api/v3/search/problem?query=${tierRange}+solvable:true&sort=random&page=1`;
+    console.log(`랜덤 문제 API 호출: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      console.error(`랜덤 문제 API 응답 오류: ${response.status}`);
+      return [];
+    }
+    
+    const data = await response.json();
+    console.log(`랜덤 API 응답: ${data.items?.length || 0}개 문제 수신`);
+    
+    if (!data.items || data.items.length === 0) {
+      console.log('랜덤 API가 문제를 반환하지 않았습니다.');
+      return [];
+    }
+    
+    // 이미 제외된 문제 필터링
+    const recommendedProblems = data.items
+      .filter(problem => !excludedProblemIds.has(problem.problemId))
+      .slice(0, count)
+      .map(problem => ({
+        id: problem.problemId.toString(),
+        title: problem.titleKo,
+        level: problem.level.toString(),
+        tags: problem.tags.map(tag => tag.displayNames.find(name => name.language === 'ko')?.name || 
+                                   tag.displayNames.find(name => name.language === 'en')?.name ||
+                                   tag.key),
+        acceptedUserCount: problem.acceptedUserCount,
+        averageTries: problem.averageTries
+      }));
+    
+    console.log(`랜덤 문제 추천 결과: ${recommendedProblems.length}개 추천`);
+    return recommendedProblems;
+  } catch (error) {
+    console.error("랜덤 문제 추천 실패:", error);
     return [];
   }
 }
