@@ -280,11 +280,13 @@ def recommend_problems(handle, page=1):
     
     # 5. 태그 기반 문제 추천
     tag_based_problems = recommend_tag_based_problems(average_tier, solved_problems, solved_problems_with_details, page)
+    print(f"태그 기반 추천 문제 수: {len(tag_based_problems)}")
     
     # 6. 인기도 기반 문제 추천
     # 태그 기반 문제가 없으면 인기도 기반 문제를 5개로 늘림
     popularity_count = 5 if len(tag_based_problems) == 0 else 3
     popularity_based_problems = recommend_popularity_based_problems(average_tier, solved_problems, solved_problems_with_details, page, popularity_count)
+    print(f"인기도 기반 추천 문제 수: {len(popularity_based_problems)}")
     
     # 7. 최종 추천 문제 목록 생성
     recommended_problems = tag_based_problems + popularity_based_problems
@@ -321,18 +323,18 @@ def recommend_problems(handle, page=1):
     
     return final_result
 
-# 태그 기반 문제 추천 (사용자가 많이 푼 태그 관련 문제)
+# 태그 기반 문제 추천 함수 수정 - offset 추가로 페이지 기능 강화
 def recommend_tag_based_problems(average_tier, solved_problems, solved_problems_with_details, page=1):
     """태그 기반으로 문제를 추천합니다."""
     print("태그 기반 문제 추천 시작...")
     
-    # 태그 빈도 분석 (추후 유사도 계산에 사용)
+    # 태그 빈도 분석
     user_tags_freq = {}
     for problem in solved_problems_with_details:
         for tag in problem.get("tags", []):
             user_tags_freq[tag] = user_tags_freq.get(tag, 0) + 1
     
-    # 사용자가 푼 태그가 없으면 빈 dictionary 반환
+    # 사용자가 푼 태그가 없으면 빈 리스트 반환
     if not user_tags_freq:
         print("사용자가 푼 문제에서 태그 정보를 찾을 수 없습니다.")
         return []
@@ -341,31 +343,38 @@ def recommend_tag_based_problems(average_tier, solved_problems, solved_problems_
     top_tags = sorted(user_tags_freq.items(), key=lambda x: x[1], reverse=True)[:3]
     print(f"가장 많이 푼 태그: {[tag[0] for tag in top_tags]}")
     
-    # solved_problems를 집합으로 변환 - 문자열과 정수 모두 지원
+    # solved_problems를 집합으로 변환
     solved_problems_set = set()
     for problem_id in solved_problems:
         solved_problems_set.add(str(problem_id))
-        solved_problems_set.add(problem_id)  # 정수 ID도 추가
+        try:
+            solved_problems_set.add(int(problem_id))
+        except (ValueError, TypeError):
+            pass
     
-    # 태그별 티어 범위 설정 (사용자 티어에 적합한 범위로 제한)
-    min_tier = max(1, average_tier - 2)  # 범위 좁힘 (이전: -3)
+    # 태그별 티어 범위 설정
+    min_tier = max(1, average_tier - 2)
     max_tier = min(10, average_tier + 1)  # 실버 1까지로 제한
     tier_range = f"{min_tier}..{max_tier}"
+    
+    # 페이지 오프셋 계산 - 페이지마다 다른 문제가 나오도록 함
+    offset = (page - 1) * 10
     
     # 각 태그에 대해 문제 검색
     all_tag_problems = []
     for tag, freq in top_tags:
         # 태그별 쿼리 생성
-        tag_query = f"*l{tier_range} {tag}"  # 태그 이름 앞에 *s 제거
+        tag_query = f"*l{tier_range} {tag}"
         
         params = {
             "query": tag_query,
-            "sort": "solved",  # 푼 사람이 많은 순으로 정렬
-            "page": page,       # 페이지 번호 적용
-            "limit": 100  # 더 많은 결과를 가져와서 필터링
+            "sort": "solved",
+            "page": page,
+            "limit": 100,
+            "offset": offset  # 오프셋 추가
         }
         
-        print(f"태그 '{tag}' 검색 쿼리: {tag_query} (페이지: {page})")
+        print(f"태그 '{tag}' 검색 쿼리: {tag_query} (페이지: {page}, 오프셋: {offset})")
         data = rate_limited_request(PROBLEM_SEARCH_ENDPOINT, params)
         
         # 검색 결과 처리
@@ -381,14 +390,14 @@ def recommend_tag_based_problems(average_tier, solved_problems, solved_problems_
             problem_id = str(item["problemId"])
             
             # 이미 푼 문제인지 확인
-            if problem_id in solved_problems_set or int(problem_id) in solved_problems_set:
+            if problem_id in solved_problems_set:
                 continue
                 
             # 언레이티드 문제 건너뛰기
             if item["level"] == 0:
                 continue
                 
-            # 너무 어려운 문제 건너뛰기 (티어가 사용자 티어보다 2단계 이상 높은 경우)
+            # 너무 어려운 문제 건너뛰기
             if item["level"] < average_tier - 2:
                 print(f"- 건너뜀 (너무 어려움): #{problem_id} [{get_tier_name_ko(item['level'])}] {item['titleKo']}")
                 continue
@@ -409,7 +418,7 @@ def recommend_tag_based_problems(average_tier, solved_problems, solved_problems_
                 "recommendation_type": "태그 기반"
             }
             filtered_problems.append(problem)
-            if len(filtered_problems) >= 5:  # 각 태그별 최대 5개 (이전: 10개)
+            if len(filtered_problems) >= 5:  # 각 태그별 최대 5개
                 break
         
         all_tag_problems.extend(filtered_problems)
@@ -427,47 +436,54 @@ def recommend_tag_based_problems(average_tier, solved_problems, solved_problems_
         return search_backup_tag_problems(average_tier, solved_problems_set, page)
     
     # 정확히 2개 반환
-    return all_tag_problems[:2]
+    result = all_tag_problems[:2]
+    print(f"최종 태그 기반 추천 문제 수: {len(result)}")
+    return result
 
-# 백업용 태그 기반 문제 검색 (일반적인 태그)
+# 백업 태그 기반 문제 검색 함수 - offset 추가로 페이지 기능 강화
 def search_backup_tag_problems(average_tier, solved_problems_set, page=1):
     """인기 있는 일반 태그로 문제를 검색합니다."""
     # 일반적인 인기 태그
     common_tags = ["implementation", "math", "string", "greedy", "dp", "bruteforcing", "graphs"]
     
-    # 태그별 티어 범위 설정 (사용자 티어에 적합한 범위로 제한)
+    # 태그별 티어 범위 설정
     min_tier = max(1, average_tier - 3)
     max_tier = min(10, average_tier + 1)  # 실버 1까지로 제한
     tier_range = f"{min_tier}..{max_tier}"
+    
+    # 페이지 오프셋 계산
+    offset = (page - 1) * 10
     
     # 각 태그에 대해 문제 검색
     all_problems = []
     for tag in common_tags:
         # 태그별 쿼리 생성
-        tag_query = f"*l{tier_range} {tag} *o20.."  # 태그 이름 앞에 *s 제거
+        tag_query = f"*l{tier_range} {tag} *o20.."
         
         params = {
             "query": tag_query,
-            "sort": "solved",  # 푼 사람이 많은 순으로 정렬
-            "page": page,      # 페이지 번호 적용
-            "limit": 50
+            "sort": "solved",
+            "page": page,
+            "limit": 50,
+            "offset": offset  # 오프셋 추가
         }
         
-        print(f"백업 태그 '{tag}' 검색 쿼리: {tag_query} (페이지: {page})")
+        print(f"백업 태그 '{tag}' 검색 쿼리: {tag_query} (페이지: {page}, 오프셋: {offset})")
         data = rate_limited_request(PROBLEM_SEARCH_ENDPOINT, params)
         
         # 검색 결과 처리
         if not data or "items" not in data or len(data["items"]) == 0:
+            print(f"백업 태그 '{tag}'에 대한 검색 결과가 없습니다.")
             continue
             
         print(f"백업 태그 '{tag}'에 대해 {len(data['items'])}개 문제 찾음")
             
-        # 이미 푼 문제와 언레이티드 문제 필터링
+        # 이미 푼 문제 필터링
         for item in data["items"]:
             problem_id = str(item["problemId"])
             
             # 이미 푼 문제인지 확인
-            if problem_id in solved_problems_set or int(problem_id) in solved_problems_set:
+            if problem_id in solved_problems_set:
                 continue
                 
             # 언레이티드 문제 건너뛰기
@@ -491,14 +507,130 @@ def search_backup_tag_problems(average_tier, solved_problems_set, page=1):
             }
             all_problems.append(problem)
             if len(all_problems) >= 2:
-                return all_problems
+                break
+        
+        if len(all_problems) >= 2:
+            break
     
     # 실버 이하 기본 문제 검색
     if not all_problems:
         print("백업 태그 검색도 실패. 실버 이하 기본 문제 검색을 시도합니다.")
         return search_basic_problems(solved_problems_set, page)
-        
+    
     return all_problems[:2]  # 최대 2개 반환
+
+# 인기도 기반 문제 추천 함수 수정 - offset 추가로 페이지 기능 강화
+def recommend_popularity_based_problems(average_tier, solved_problems, solved_problems_with_details, page=1, count=3):
+    """인기도(푼 사람이 많은 순) 기준으로 문제를 추천합니다."""
+    print(f"인기도 기반 문제 추천 시작... (페이지: {page}, 추천 개수: {count})")
+    
+    # solved_problems를 문자열과 정수 모두 포함하는 집합으로 변환
+    solved_problems_set = set()
+    for problem_id in solved_problems:
+        solved_problems_set.add(str(problem_id))
+        try:
+            solved_problems_set.add(int(problem_id))
+        except (ValueError, TypeError):
+            pass  # 정수로 변환할 수 없는 경우 무시
+    
+    print(f"사용자가 푼 문제 수: {len(solved_problems)}")
+    print(f"중복 제거된 문제 ID 집합 크기: {len(solved_problems_set)}")
+    
+    # API를 통한 인기 문제 검색으로 대체
+    # 기본 브론즈~실버 범위 설정
+    min_tier = max(1, average_tier - 2)
+    max_tier = min(15, average_tier + 3)  # 골드까지 범위 확장
+    tier_range = f"{min_tier}..{max_tier}"
+    
+    # 페이지 오프셋 계산 - 페이지마다 다른 문제가 나오도록 함
+    offset = (page - 1) * 10
+    
+    # 인기도 기준 쿼리 생성
+    popularity_query = f"*l{tier_range} *o500.."  # 최소 500명 이상이 푼 문제
+    
+    params = {
+        "query": popularity_query,
+        "sort": "solved",      # 푼 사람이 많은 순으로 정렬
+        "page": page,          # 페이지 번호 적용
+        "limit": 50,
+        "offset": offset       # 오프셋 추가
+    }
+    
+    print(f"인기도 문제 검색 쿼리: {popularity_query} (페이지: {page}, 오프셋: {offset})")
+    data = rate_limited_request(PROBLEM_SEARCH_ENDPOINT, params)
+    
+    # 검색 결과 처리
+    if not data or "items" not in data or len(data["items"]) == 0:
+        print("인기도 문제 검색 실패")
+        return search_common_problems(solved_problems_set, page)
+        
+    print(f"인기도 문제 검색에서 {len(data['items'])}개 문제 찾음")
+    
+    # 이미 푼 문제 필터링
+    filtered_problems = []
+    for item in data["items"]:
+        problem_id = str(item["problemId"])
+        
+        # 이미 푼 문제인지 확인
+        if problem_id in solved_problems_set or int(problem_id) in solved_problems_set:
+            continue
+            
+        # 언레이티드 문제 건너뛰기
+        if item["level"] == 0:
+            continue
+            
+        # 문제 정보 구성
+        solved_count = item.get("solvedCount", 0)
+        
+        # 기본 태그 추가
+        problem_tags = [tag_info["key"] for tag_info in item.get("tags", [])]
+        if not problem_tags:
+            problem_tags = ["implementation"]
+        
+        # 점수 계산
+        popularity_score = min(60, (solved_count / 10000))  # 10000명당 1점
+        tier_bonus = 0
+        if average_tier >= 6 and item["level"] >= 6:  # 사용자와 문제가 모두 실버 이상인 경우
+            tier_bonus = 20
+            
+        problem = {
+            "id": problem_id,
+            "title": item["titleKo"],
+            "level": item["level"],
+            "tags": problem_tags,
+            "solved_count": solved_count,
+            "score": 40 + popularity_score + tier_bonus,
+            "score_details": {
+                "difficulty": 20,
+                "tag_similarity": 10,
+                "popularity": popularity_score,
+                "tier_bonus": tier_bonus
+            },
+            "recommendation_type": "인기도 기반"
+        }
+        
+        filtered_problems.append(problem)
+        print(f"- 추가됨: #{problem_id} [{get_tier_name_ko(item['level'])}] {item['titleKo']} (푼 사람: {solved_count}명)")
+        
+        if len(filtered_problems) >= count + 5:  # 여유있게 몇 개 더 가져옴
+            break
+    
+    # 인기도(푼 사람 수) 기준 정렬
+    filtered_problems.sort(key=lambda x: x["solved_count"], reverse=True)
+    
+    print(f"인기도 기반 추천 {len(filtered_problems)}개 찾음")
+    for i, prob in enumerate(filtered_problems[:count], 1):
+        print(f"- 인기도 추천 {i}: #{prob['id']} [{get_tier_name_ko(prob['level'])}] {prob['title']} (푼 사람: {prob['solved_count']}명)")
+    
+    # 인기도 기반 문제가 없는 경우 기본 문제 검색
+    if not filtered_problems:
+        print("인기도 기반 문제를 찾을 수 없어 기본 문제 검색으로 전환합니다.")
+        return search_common_problems(solved_problems_set, page)
+    
+    # 요청된 개수만큼 반환 (중요: 원래 요청된 count 개수만큼만 반환)
+    result = filtered_problems[:count]
+    print(f"최종 인기도 기반 추천 문제 수: {len(result)}")
+    return result
 
 # 기본 문제 검색 (실버 이하)
 def search_basic_problems(solved_problems_set, page=1):
@@ -561,113 +693,6 @@ def search_basic_problems(solved_problems_set, page=1):
             break
     
     return filtered_problems
-
-# 인기도 기반 문제 추천 (푼 사람이 많은 문제)
-def recommend_popularity_based_problems(average_tier, solved_problems, solved_problems_with_details, page=1, count=3):
-    """인기도(푼 사람이 많은 순) 기준으로 문제를 추천합니다."""
-    print(f"인기도 기반 문제 추천 시작... (페이지: {page}, 추천 개수: {count})")
-    
-    # solved_problems를 문자열과 정수 모두 포함하는 집합으로 변환
-    solved_problems_set = set()
-    for problem_id in solved_problems:
-        solved_problems_set.add(str(problem_id))
-        try:
-            solved_problems_set.add(int(problem_id))
-        except (ValueError, TypeError):
-            pass  # 정수로 변환할 수 없는 경우 무시
-    
-    print(f"사용자가 푼 문제 수: {len(solved_problems)}")
-    print(f"중복 제거된 문제 ID 집합 크기: {len(solved_problems_set)}")
-    
-    # API를 통한 인기 문제 검색으로 대체
-    # 기본 브론즈~실버 범위 설정
-    min_tier = max(1, average_tier - 2)
-    max_tier = min(15, average_tier + 3)  # 골드까지 범위 확장
-    tier_range = f"{min_tier}..{max_tier}"
-    
-    # 인기도 기준 쿼리 생성
-    popularity_query = f"*l{tier_range} *o500.."  # 최소 500명 이상이 푼 문제
-    
-    params = {
-        "query": popularity_query,
-        "sort": "solved",      # 푼 사람이 많은 순으로 정렬
-        "page": page,          # 페이지 번호 적용
-        "limit": 50
-    }
-    
-    print(f"인기도 문제 검색 쿼리: {popularity_query} (페이지: {page})")
-    data = rate_limited_request(PROBLEM_SEARCH_ENDPOINT, params)
-    
-    # 검색 결과 처리
-    if not data or "items" not in data or len(data["items"]) == 0:
-        print("인기도 문제 검색 실패")
-        return search_common_problems(solved_problems_set, page)
-        
-    print(f"인기도 문제 검색에서 {len(data['items'])}개 문제 찾음")
-    
-    # 이미 푼 문제 필터링
-    filtered_problems = []
-    for item in data["items"]:
-        problem_id = str(item["problemId"])
-        
-        # 이미 푼 문제인지 확인
-        if problem_id in solved_problems_set or int(problem_id) in solved_problems_set:
-            continue
-            
-        # 언레이티드 문제 건너뛰기
-        if item["level"] == 0:
-            continue
-            
-        # 문제 정보 구성
-        solved_count = item.get("solvedCount", 0)
-        
-        # 기본 태그 추가
-        problem_tags = [tag_info["key"] for tag_info in item.get("tags", [])]
-        if not problem_tags:
-            problem_tags = ["implementation"]
-        
-        # 점수 계산
-        popularity_score = min(60, (solved_count / 10000))  # 10000명당 1점
-        tier_bonus = 0
-        if average_tier >= 6 and item["level"] >= 6:  # 사용자와 문제가 모두 실버 이상인 경우
-            tier_bonus = 20
-            
-        problem = {
-            "id": problem_id,
-            "title": item["titleKo"],
-            "level": item["level"],
-            "tags": problem_tags,
-            "solved_count": solved_count,
-            "score": 40 + popularity_score + tier_bonus,
-            "score_details": {
-                "difficulty": 20,
-                "tag_similarity": 10,
-                "popularity": popularity_score,
-                "tier_bonus": tier_bonus
-            },
-            "recommendation_type": "인기도 기반"
-        }
-        
-        filtered_problems.append(problem)
-        print(f"- 추가됨: #{problem_id} [{get_tier_name_ko(item['level'])}] {item['titleKo']} (푼 사람: {solved_count}명)")
-        
-        if len(filtered_problems) >= count + 2:  # 여유있게 몇 개 더 가져옴
-            break
-    
-    # 인기도(푼 사람 수) 기준 정렬
-    filtered_problems.sort(key=lambda x: x["solved_count"], reverse=True)
-    
-    print(f"인기도 기반 추천 {len(filtered_problems)}개 찾음")
-    for i, prob in enumerate(filtered_problems[:count], 1):
-        print(f"- 인기도 추천 {i}: #{prob['id']} [{get_tier_name_ko(prob['level'])}] {prob['title']} (푼 사람: {prob['solved_count']}명)")
-    
-    # 인기도 기반 문제가 없는 경우 기본 문제 검색
-    if not filtered_problems:
-        print("인기도 기반 문제를 찾을 수 없어 기본 문제 검색으로 전환합니다.")
-        return search_common_problems(solved_problems_set, page)
-    
-    # 요청된 개수만큼 반환
-    return filtered_problems[:count]
 
 # 기본적인 추천 문제 검색 (기초 문제)
 def search_common_problems(solved_problems_set, page=1):
