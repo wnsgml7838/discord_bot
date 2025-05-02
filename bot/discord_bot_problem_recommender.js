@@ -380,7 +380,7 @@ async function recommendTagBasedProblems(targetTier, solvedProblems, solvedProbl
       return [];
     }
     
-    // 각 페이지마다 다른 태그 선택
+    // 각 페이지마다 다른 태그 선택 (태그 순환 방식 유지)
     const selectedTagIndex = (page - 1) % topTags.length;
     const selectedTag = topTags[selectedTagIndex];
     
@@ -403,9 +403,9 @@ async function recommendTagBasedProblems(targetTier, solvedProblems, solvedProbl
     
     const tagId = tagSearchData.items[0].key;
     
-    // 해당 태그의 문제 검색
+    // 해당 태그의 문제 검색 (API에 page 파라미터 직접 전달)
     const tierRange = `*${minTier}..${maxTier}`;
-    const taggedProblemResponse = await fetch(`https://solved.ac/api/v3/search/problem?query=tag:${tagId}+${tierRange}&page=1`);
+    const taggedProblemResponse = await fetch(`https://solved.ac/api/v3/search/problem?query=tag:${tagId}+${tierRange}&page=${page}&sort=level&direction=asc`); // 레벨 오름차순 정렬 추가
     
     if (!taggedProblemResponse.ok) {
       return [];
@@ -416,12 +416,10 @@ async function recommendTagBasedProblems(targetTier, solvedProblems, solvedProbl
     // 이미 해결한 문제 제외
     const solvedProblemSet = new Set(solvedProblems);
     
-    // 각 페이지마다 다른 오프셋 사용
-    const pageOffset = ((page - 1) * 2) % Math.max(1, taggedProblemData.count);
-    
+    // API 결과에서 해결하지 않은 문제 최대 2개 선택 (오프셋 로직 제거)
     const recommendedProblems = taggedProblemData.items
       .filter(problem => !solvedProblemSet.has(problem.problemId))
-      .slice(pageOffset, pageOffset + 2)  // 최대 2개 선택
+      .slice(0, 2)  // API 페이지 결과에서 최대 2개 선택
       .map(problem => ({
         id: problem.problemId.toString(),
         title: problem.titleKo,
@@ -459,9 +457,10 @@ async function recommendPopularityBasedProblems(targetTier, solvedProblems, solv
     const minTier = Math.max(1, targetTier - 3);
     const maxTier = Math.min(30, targetTier + 3);
     
-    // 인기도 기반 문제 검색 (solved_by:)
+    // 인기도 기반 문제 검색 (API에 page 파라미터 직접 전달)
     const tierRange = `*${minTier}..${maxTier}`;
-    const popularProblemResponse = await fetch(`https://solved.ac/api/v3/search/problem?query=${tierRange}+solvable:true&sort=solved&page=1`);
+    // 인기도(solved) 내림차순 정렬
+    const popularProblemResponse = await fetch(`https://solved.ac/api/v3/search/problem?query=${tierRange}+solvable:true&sort=solved&direction=desc&page=${page}`);
     
     if (!popularProblemResponse.ok) {
       return [];
@@ -472,12 +471,10 @@ async function recommendPopularityBasedProblems(targetTier, solvedProblems, solv
     // 이미 해결한 문제 제외
     const solvedProblemSet = new Set(solvedProblems);
     
-    // 각 페이지마다 다른 오프셋 사용
-    const pageOffset = ((page - 1) * count + count) % Math.max(1, popularProblemData.count);
-    
+    // API 결과에서 해결하지 않은 문제 count개 선택 (오프셋 로직 제거)
     const recommendedProblems = popularProblemData.items
       .filter(problem => !solvedProblemSet.has(problem.problemId))
-      .slice(pageOffset, pageOffset + count)
+      .slice(0, count) // API 페이지 결과에서 필요한 개수(count)만큼 선택
       .map(problem => ({
         id: problem.problemId.toString(),
         title: problem.titleKo,
