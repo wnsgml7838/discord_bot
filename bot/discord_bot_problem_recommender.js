@@ -103,14 +103,55 @@ async function recommendBaekjoonProblems(handle, page = 1) {
     // 8. 최종 추천 문제 목록 생성
     let recommendedProblems = [...tagBasedProblems, ...popularityBasedProblems];
     
-    // 문제를 티어 기준으로 정렬 (오름차순 - 낮은 티어/쉬운 문제가 먼저 나오도록)
+    // 8-1. 문제 개수가 5개 미만인 경우 추가로 인기도 기반 문제 추천
+    if (recommendedProblems.length < totalRecommendationsNeeded) {
+      const additionalCount = totalRecommendationsNeeded - recommendedProblems.length;
+      console.log(`문제 개수가 부족합니다. 추가로 ${additionalCount}개의 인기도 기반 문제를 추천합니다.`);
+      
+      // 이미 추천된 문제 ID 목록 (제외할 목록)
+      const excludedProblemIds = new Set([
+        ...solvedProblems, // 이미 해결한 문제
+        ...recommendedProblems.map(p => parseInt(p.id)) // 이미 추천된 문제
+      ]);
+      
+      // 다음 페이지부터 추가 문제 검색
+      let additionalPage = page + 1;
+      let additionalProblems = [];
+      
+      // 필요한 개수를 채울 때까지 최대 3페이지까지 추가 검색
+      while (additionalProblems.length < additionalCount && additionalPage < page + 4) {
+        const addedProblems = await recommendAdditionalPopularityProblems(
+          averageTier, 
+          excludedProblemIds, 
+          additionalPage, 
+          additionalCount
+        );
+        
+        if (addedProblems.length === 0) {
+          // 더 이상 추천할 문제가 없으면 중단
+          break;
+        }
+        
+        additionalProblems = [...additionalProblems, ...addedProblems];
+        // 필요한 개수만 남기기
+        additionalProblems = additionalProblems.slice(0, additionalCount);
+        additionalPage++;
+      }
+      
+      console.log(`추가 인기도 기반 추천 문제 수: ${additionalProblems.length}`);
+      
+      // 추가 문제 병합
+      recommendedProblems = [...recommendedProblems, ...additionalProblems];
+    }
+    
+    // 9. 문제를 티어 기준으로 정렬 (오름차순 - 낮은 티어/쉬운 문제가 먼저 나오도록)
     recommendedProblems.forEach(problem => {
       problem.levelInt = parseInt(problem.level);
     });
     
     recommendedProblems.sort((a, b) => a.levelInt - b.levelInt);
     
-    // 9. 결과 출력
+    // 10. 결과 출력
     const result = formatRecommendations(recommendedProblems, averageTier);
     
     // 최종 추천 수가 5개 미만일 경우 추가 메시지
@@ -119,9 +160,9 @@ async function recommendBaekjoonProblems(handle, page = 1) {
       console.log(`경고: 추천 문제가 ${totalRecommended}개로, 목표인 ${totalRecommendationsNeeded}개보다 적습니다.`);
     }
     
-    // 10. 안내 메시지 추가
+    // 11. 안내 메시지 추가
     const finalTagCount = tagBasedProblems.length;
-    const finalPopCount = popularityBasedProblems.length;
+    const finalPopCount = recommendedProblems.length - finalTagCount;
     
     let recommendationMsg;
     if (finalTagCount === 0) {
@@ -489,6 +530,56 @@ async function recommendPopularityBasedProblems(targetTier, solvedProblems, solv
     return recommendedProblems;
   } catch (error) {
     console.error("인기도 기반 문제 추천 실패:", error);
+    return [];
+  }
+}
+
+/**
+ * 추가 인기도 기반 문제 추천 (부족한 개수 채우기 위한 함수)
+ * @param {number} targetTier - 목표 티어
+ * @param {Set} excludedProblemIds - 제외할 문제 ID 목록 (이미 해결했거나 이미 추천된 문제)
+ * @param {number} page - 페이지 번호
+ * @param {number} count - 필요한 문제 수
+ * @returns {Promise<Array>} - 추천 문제 배열
+ */
+async function recommendAdditionalPopularityProblems(targetTier, excludedProblemIds, page, count) {
+  try {
+    if (count <= 0) {
+      return [];
+    }
+    
+    // 목표 티어 범위 설정 (±4, 더 넓은 범위로 검색)
+    const minTier = Math.max(1, targetTier - 4);
+    const maxTier = Math.min(30, targetTier + 4);
+    
+    // 인기도 기반 문제 검색
+    const tierRange = `*${minTier}..${maxTier}`;
+    const popularProblemResponse = await fetch(`https://solved.ac/api/v3/search/problem?query=${tierRange}+solvable:true&sort=solved&direction=desc&page=${page}`);
+    
+    if (!popularProblemResponse.ok) {
+      return [];
+    }
+    
+    const popularProblemData = await popularProblemResponse.json();
+    
+    // 이미 해결했거나 이미 추천된 문제 제외
+    const recommendedProblems = popularProblemData.items
+      .filter(problem => !excludedProblemIds.has(problem.problemId))
+      .slice(0, count)
+      .map(problem => ({
+        id: problem.problemId.toString(),
+        title: problem.titleKo,
+        level: problem.level.toString(),
+        tags: problem.tags.map(tag => tag.displayNames.find(name => name.language === 'ko')?.name || 
+                                    tag.displayNames.find(name => name.language === 'en')?.name ||
+                                    tag.key),
+        acceptedUserCount: problem.acceptedUserCount,
+        averageTries: problem.averageTries
+      }));
+    
+    return recommendedProblems;
+  } catch (error) {
+    console.error("추가 인기도 기반 문제 추천 실패:", error);
     return [];
   }
 }
