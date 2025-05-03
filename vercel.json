@@ -23,7 +23,7 @@
     },
     {
       "path": "/api/discord-log-sync",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 } 
