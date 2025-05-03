@@ -3,31 +3,7 @@
  * 백준 문제를 추천하는 자바스크립트 구현
  */
 
-// node-fetch v3는 ESM 모듈이므로 CommonJS에서 직접 사용 불가능
-// 크로스 버전 호환을 위해 동적 import 처리
-let fetch;
-
-// 즉시 함수 실행 대신 일반 함수로 변경하여 비동기 초기화 문제 해결
-function initFetch() {
-  if (fetch) return; // 이미 초기화됨
-  
-  try {
-    // Node.js 18 이상의 내장 fetch 사용 시도
-    if (global.fetch) {
-      fetch = global.fetch;
-      console.log('내장 fetch 함수 사용');
-      return;
-    }
-    
-    // node-fetch 사용 시도 (CommonJS)
-    fetch = require('node-fetch');
-    console.log('node-fetch (CommonJS) 사용');
-  } catch (err) {
-    console.error('fetch 초기화 실패, HTTP 요청을 사용할 수 없습니다:', err);
-    // 임시 fetch 함수 (실제 실행 시 오류 발생)
-    fetch = async () => { throw new Error('fetch 함수가 초기화되지 않았습니다'); };
-  }
-}
+import fetch from 'node-fetch';
 
 // cheerio 로드
 let cheerio;
@@ -46,9 +22,6 @@ try {
  * @returns {Promise<string>} - 추천 결과 메시지 (HTML 형식)
  */
 async function recommendBaekjoonProblems(handle, page = 1) {
-  // fetch 초기화
-  initFetch();
-  
   // 문자열로 들어온 페이지 번호를 정수로 변환
   if (typeof page === 'string') {
     page = parseInt(page) || 1;

@@ -11,17 +11,6 @@ const nextConfig = {
     GITHUB_OWNER: process.env.GITHUB_OWNER,
     GITHUB_REPO: process.env.GITHUB_REPO,
   },
-  // 서버 사이드 환경변수 설정
-  serverRuntimeConfig: {
-    GITHUB_TOKEN: process.env.GITHUB_TOKEN,
-    GITHUB_OWNER: process.env.GITHUB_OWNER,
-    GITHUB_REPO: process.env.GITHUB_REPO,
-  },
-  // 공용 런타임 설정
-  publicRuntimeConfig: {
-    GITHUB_OWNER: process.env.GITHUB_OWNER,
-    GITHUB_REPO: process.env.GITHUB_REPO,
-  },
   // CORS 헤더 설정
   async headers() {
     return [
@@ -37,26 +26,9 @@ const nextConfig = {
       },
     ];
   },
-  experimental: {
-    // Vercel에서의 빌드 성능 최적화
-    optimizeCss: true,
-    scrollRestoration: true,
-  },
-  swcMinify: true, // Rust 기반 SWC 컴파일러 사용
-  poweredByHeader: false, // X-Powered-By 헤더 제거
-  onDemandEntries: {
-    // 개발 서버 최적화 설정
-    maxInactiveAge: 25 * 1000,
-    pagesBufferLength: 2,
-  },
-  typescript: {
-    // 프로덕션 빌드시 타입 체크 건너뛰기 (CI/CD에서는 별도 타입 체크 단계 권장)
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    // 프로덕션 빌드시 ESLint 체크 건너뛰기 (CI/CD에서는 별도 검사 단계 권장)
-    ignoreDuringBuilds: true,
-  },
+  // 기본 최적화 설정
+  swcMinify: true,
+  poweredByHeader: false,
 }
 
 module.exports = nextConfig 

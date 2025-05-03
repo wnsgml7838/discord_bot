@@ -2,6 +2,7 @@
   "name": "discord-bot-dashboard",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev -p 3001 -H 0.0.0.0",
     "build": "next build",
@@ -18,6 +19,7 @@
     "canvas": "^3.1.0",
     "chart.js": "^4.3.0",
     "cheerio": "^1.0.0-rc.12",
+    "critters": "^0.0.20",
     "csv-parser": "^3.0.0",
     "csv-writer": "^1.6.0",
     "date-fns": "^2.30.0",
