@@ -1,6 +1,7 @@
 /**
  * 디스코드 로그 동기화 API (하루 한 번 실행)
- * 노트북이 꺼져있더라도 Discord API를 통해 로그를 수집합니다.
+ * 노트북이 꺼져있더라도 Discord API를 통해 로그를 수집하고,
+ * 기존 로그 파일(public/image_log.json)과 통합합니다.
  */
 
 // 환경 변수
@@ -11,6 +12,7 @@ const MONITORED_CHANNEL_IDS = process.env.MONITORED_CHANNEL_IDS ?
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPO = process.env.GITHUB_REPO || 'wnsgml7838/discord_bot';
 const LOG_FILE_PATH = 'data/auth_logs.json';
+const PUBLIC_LOG_FILE_PATH = 'public/image_log.json';
 
 /**
  * Discord 웹훅에 로그 메시지 전송
@@ -47,12 +49,12 @@ async function logToWebhook(title, description, fields = [], color = 0x00ff00, i
 /**
  * GitHub에서 기존 로그 파일 가져오기
  */
-async function fetchExistingLogs() {
+async function fetchExistingLogs(filePath) {
   if (!GITHUB_TOKEN) return { success: false, logs: [], error: 'GitHub 토큰이 설정되지 않았습니다' };
   
   try {
     // 파일 내용 가져오기 (base64로 인코딩됨)
-    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${LOG_FILE_PATH}`, {
+    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`, {
       headers: {
         'Authorization': `token ${GITHUB_TOKEN}`,
         'Accept': 'application/vnd.github.v3+json'
@@ -86,7 +88,7 @@ async function fetchExistingLogs() {
 /**
  * GitHub에 업데이트된 로그 파일 저장
  */
-async function saveLogsToGitHub(logs, existingSha) {
+async function saveLogsToGitHub(logs, filePath, existingSha) {
   if (!GITHUB_TOKEN) return { success: false, error: 'GitHub 토큰이 설정되지 않았습니다' };
   
   try {
@@ -98,7 +100,7 @@ async function saveLogsToGitHub(logs, existingSha) {
       ...(existingSha ? { sha: existingSha } : {})
     };
     
-    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${LOG_FILE_PATH}`, {
+    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`, {
       method: 'PUT',
       headers: {
         'Authorization': `token ${GITHUB_TOKEN}`,
@@ -152,11 +154,41 @@ async function fetchChannelMessages(channelId, limit = 100, after = null) {
 }
 
 /**
+ * 메시지 내용이 인증 이미지를 포함하는지 확인
+ */
+function isAuthImageMessage(message) {
+  // 이미지 첨부 파일이 있는지 확인
+  if (message.attachments && message.attachments.length > 0) {
+    const attachment = message.attachments[0];
+    // 이미지 형식 체크
+    return attachment.content_type && attachment.content_type.startsWith('image/');
+  }
+  
+  // 이미지 URL이 포함된 메시지 내용 확인
+  const imageUrlPattern = /(https?:\/\/.*\.(?:png|jpg|jpeg|gif|webp))/i;
+  return imageUrlPattern.test(message.content);
+}
+
+/**
+ * 메시지에서 인증 이미지 URL 추출
+ */
+function extractImageUrl(message) {
+  // 첨부 파일에서 이미지 URL 가져오기
+  if (message.attachments && message.attachments.length > 0) {
+    return message.attachments[0].url || message.attachments[0].proxy_url;
+  }
+  
+  // 메시지 내용에서 이미지 URL 추출
+  const imageUrlPattern = /(https?:\/\/.*\.(?:png|jpg|jpeg|gif|webp))/i;
+  const match = message.content.match(imageUrlPattern);
+  return match ? match[1] : null;
+}
+
+/**
  * 메시지 내용에서 인증 로그 정보 추출
- * 예상 형식: "사용자명이 인증에 성공했습니다" 등의 메시지
  */
 function extractAuthLogInfo(message) {
-  // 기본 메시지 정보
+  // 기존 로그 형식 유지
   const logInfo = {
     id: message.id,
     timestamp: message.timestamp,
@@ -197,6 +229,36 @@ function extractAuthLogInfo(message) {
   return logInfo;
 }
 
+/**
+ * public/image_log.json 형식에 맞는 로그 항목 생성
+ */
+function createImageLogEntry(message) {
+  // 한국 시간대(KST)로 변환 (UTC+9)
+  const timestamp = new Date(message.timestamp);
+  const kstTimestamp = new Date(timestamp.getTime() + (9 * 60 * 60 * 1000));
+  
+  // ISO 형식의 타임스탬프 문자열
+  const timestampStr = timestamp.toISOString().replace('T', ' ').slice(0, 19);
+  
+  // KST 형식의 타임스탬프 문자열
+  const kstTimestampStr = kstTimestamp.toISOString().replace('T', ' ').slice(0, 19);
+  
+  // 이미지 URL 추출
+  const image_url = extractImageUrl(message);
+  
+  // 닉네임 추출 (일반적으로 디스코드 사용자명)
+  const nickname = message.author.username;
+  
+  return {
+    nickname,
+    timestamp: timestamp.toISOString(),
+    timestampStr,
+    kstTimestampStr,
+    image_url,
+    messageId: message.id
+  };
+}
+
 export default async function handler(req, res) {
   // 결과 객체 초기화
   const result = {
@@ -205,7 +267,8 @@ export default async function handler(req, res) {
     logs: {
       collected: 0,
       newEntries: 0,
-      channels: {}
+      channels: {},
+      imageLogsAdded: 0
     },
     errors: []
   };
@@ -239,34 +302,49 @@ export default async function handler(req, res) {
       return res.status(400).json(result);
     }
     
-    // 기존 로그 가져오기
-    const { success: fetchSuccess, logs: existingLogs, sha, error: fetchError } = await fetchExistingLogs();
+    // 기존 로그 파일들 가져오기
+    const { success: fetchAuthSuccess, logs: existingAuthLogs, sha: authSha, error: fetchAuthError } = 
+      await fetchExistingLogs(LOG_FILE_PATH);
     
-    if (!fetchSuccess) {
-      result.errors.push(`기존 로그 가져오기 실패: ${fetchError}`);
+    const { success: fetchImageSuccess, logs: existingImageLogs, sha: imageSha, error: fetchImageError } = 
+      await fetchExistingLogs(PUBLIC_LOG_FILE_PATH);
+    
+    if (!fetchAuthSuccess) {
+      result.errors.push(`인증 로그 가져오기 실패: ${fetchAuthError}`);
       await logToWebhook(
         '⚠️ 로그 동기화 오류', 
-        `GitHub에서 기존 로그를 가져오는 중 오류가 발생했습니다: ${fetchError}`, 
+        `GitHub에서 인증 로그를 가져오는 중 오류가 발생했습니다: ${fetchAuthError}`, 
         [], 0, true
       );
-      // 오류가 있어도 계속 진행 (신규 로그만 수집)
+      // 오류가 있어도 계속 진행
+    }
+    
+    if (!fetchImageSuccess) {
+      result.errors.push(`이미지 로그 가져오기 실패: ${fetchImageError}`);
+      await logToWebhook(
+        '⚠️ 로그 동기화 오류', 
+        `GitHub에서 이미지 로그를 가져오는 중 오류가 발생했습니다: ${fetchImageError}`, 
+        [], 0, true
+      );
+      // 오류가 있어도 계속 진행
     }
     
     // 24시간 이전 타임스탬프 계산 (밀리초)
     const oneDayAgo = now.getTime() - (24 * 60 * 60 * 1000);
-    const lastProcessedIds = {};
-    const newLogs = [...(existingLogs || [])];
+    const newAuthLogs = [...(existingAuthLogs || [])];
+    const newImageLogs = [...(existingImageLogs || [])];
     let totalNewLogs = 0;
+    let totalNewImageLogs = 0;
     
     // 각 모니터링 채널에서 메시지 가져오기
     for (const channelId of MONITORED_CHANNEL_IDS) {
-      result.logs.channels[channelId] = { processed: 0, new: 0, errors: [] };
+      result.logs.channels[channelId] = { processed: 0, new: 0, newImages: 0, errors: [] };
       
       try {
         // 가장 최근에 처리된 메시지 ID 찾기 (채널별)
         let lastMessageId = null;
-        if (existingLogs && existingLogs.length > 0) {
-          const channelLogs = existingLogs.filter(log => log.channelId === channelId);
+        if (existingAuthLogs && existingAuthLogs.length > 0) {
+          const channelLogs = existingAuthLogs.filter(log => log.channelId === channelId);
           if (channelLogs.length > 0) {
             // ID 기준 정렬 (내림차순)
             channelLogs.sort((a, b) => b.id.localeCompare(a.id));
@@ -298,15 +376,29 @@ export default async function handler(req, res) {
           const messageTime = new Date(message.timestamp).getTime();
           if (messageTime < oneDayAgo) continue;
           
-          // 인증 로그 정보 추출
+          // 1. 인증 로그용 정보 추출 및 저장
           const logInfo = extractAuthLogInfo(message);
-          
-          // 이미 처리된 메시지 건너뛰기
-          const existingLogIndex = existingLogs ? existingLogs.findIndex(log => log.id === logInfo.id) : -1;
+          const existingLogIndex = existingAuthLogs ? existingAuthLogs.findIndex(log => log.id === logInfo.id) : -1;
           if (existingLogIndex === -1) {
-            newLogs.push(logInfo);
+            newAuthLogs.push(logInfo);
             result.logs.channels[channelId].new++;
             totalNewLogs++;
+          }
+          
+          // 2. 이미지 로그용 정보 추출 및 저장 (이미지가 있는 메시지만)
+          if (isAuthImageMessage(message)) {
+            // 이미 처리된 메시지인지 확인
+            const existingImageIndex = existingImageLogs ? 
+              existingImageLogs.findIndex(log => log.messageId === message.id) : -1;
+            
+            if (existingImageIndex === -1) {
+              const imageLogEntry = createImageLogEntry(message);
+              if (imageLogEntry.image_url) {
+                newImageLogs.push(imageLogEntry);
+                result.logs.channels[channelId].newImages++;
+                totalNewImageLogs++;
+              }
+            }
           }
         }
       } catch (channelError) {
@@ -316,28 +408,50 @@ export default async function handler(req, res) {
     }
     
     // 로그 정렬 (시간 기준 내림차순)
-    newLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    newAuthLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    newImageLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     
     // 결과 업데이트
-    result.logs.collected = newLogs.length;
+    result.logs.collected = newAuthLogs.length;
     result.logs.newEntries = totalNewLogs;
+    result.logs.imageLogsAdded = totalNewImageLogs;
     
-    // GitHub에 로그 저장 (새 로그가 있는 경우만)
+    // 새 로그가 있는 경우만 저장
+    let saveSuccess = true;
+    
     if (totalNewLogs > 0) {
-      const { success: saveSuccess, error: saveError } = await saveLogsToGitHub(newLogs, sha);
+      const { success: authSaveSuccess, error: authSaveError } = 
+        await saveLogsToGitHub(newAuthLogs, LOG_FILE_PATH, authSha);
       
-      if (!saveSuccess) {
-        result.errors.push(`로그 저장 실패: ${saveError}`);
+      if (!authSaveSuccess) {
+        saveSuccess = false;
+        result.errors.push(`인증 로그 저장 실패: ${authSaveError}`);
         await logToWebhook(
           '⚠️ 로그 저장 오류', 
-          `GitHub에 로그를 저장하는 중 오류가 발생했습니다: ${saveError}`, 
+          `GitHub에 인증 로그를 저장하는 중 오류가 발생했습니다: ${authSaveError}`, 
           [], 0, true
         );
-      } else {
-        result.success = true;
       }
-    } else {
-      result.success = true;
+    }
+    
+    if (totalNewImageLogs > 0) {
+      const { success: imageSaveSuccess, error: imageSaveError } = 
+        await saveLogsToGitHub(newImageLogs, PUBLIC_LOG_FILE_PATH, imageSha);
+      
+      if (!imageSaveSuccess) {
+        saveSuccess = false;
+        result.errors.push(`이미지 로그 저장 실패: ${imageSaveError}`);
+        await logToWebhook(
+          '⚠️ 로그 저장 오류', 
+          `GitHub에 이미지 로그를 저장하는 중 오류가 발생했습니다: ${imageSaveError}`, 
+          [], 0, true
+        );
+      }
+    }
+    
+    // 최종 성공 여부 결정
+    result.success = saveSuccess || (totalNewLogs === 0 && totalNewImageLogs === 0);
+    if (totalNewLogs === 0 && totalNewImageLogs === 0) {
       result.info = "새로운 로그가 없습니다";
     }
     
@@ -349,13 +463,18 @@ export default async function handler(req, res) {
         inline: false
       },
       {
-        name: '수집된 총 로그',
-        value: `${newLogs.length}개`,
+        name: '수집된 총 인증 로그',
+        value: `${newAuthLogs.length}개`,
         inline: true
       },
       {
-        name: '새로 추가된 로그',
+        name: '새로 추가된 인증 로그',
         value: `${totalNewLogs}개`,
+        inline: true
+      },
+      {
+        name: '새로 추가된 이미지 로그',
+        value: `${totalNewImageLogs}개`,
         inline: true
       }
     ];
@@ -365,7 +484,7 @@ export default async function handler(req, res) {
       const channelInfo = result.logs.channels[channelId];
       fields.push({
         name: `채널 ${channelId}`,
-        value: `처리: ${channelInfo.processed}개, 신규: ${channelInfo.new}개${
+        value: `처리: ${channelInfo.processed}개, 신규 인증: ${channelInfo.new}개, 신규 이미지: ${channelInfo.newImages}개${
           channelInfo.errors.length > 0 ? `\n오류: ${channelInfo.errors.length}개` : ''
         }`,
         inline: true
@@ -384,7 +503,7 @@ export default async function handler(req, res) {
     
     await logToWebhook(
       '📊 디스코드 로그 동기화 결과', 
-      `${dateStr} (${dayOfWeek}) 디스코드 로그 동기화가 ${result.success ? '완료' : '실패'}되었습니다.\n실행 시간: ${timeStr}`,
+      `${dateStr} (${dayOfWeek}) 디스코드 로그 동기화가 ${result.success ? '완료' : '일부 실패'}되었습니다.\n실행 시간: ${timeStr}`,
       fields,
       result.success ? 0x00ff00 : 0xffcc00
     );
