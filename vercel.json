@@ -22,7 +22,7 @@
       "schedule": "0 */3 * * *"
     },
     {
-      "path": "/api/discord-log-sync",
+      "path": "/api/discord-log-sync-simple",
       "schedule": "*/5 * * * *"
     }
   ]
