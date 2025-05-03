@@ -23,9 +23,9 @@ const MONITORED_CHANNEL_IDS = process.env.MONITORED_CHANNEL_IDS ?
 /**
  * GitHub API 클라이언트 초기화
  */
-const octokit = new Octokit({
+const octokit = GITHUB_TOKEN ? new Octokit({
   auth: GITHUB_TOKEN
-});
+}) : null;
 
 /**
  * 웹훅 로깅 함수
@@ -58,6 +58,11 @@ async function logToWebhook(message) {
  * GitHub에서 로그 파일 가져오기
  */
 async function getLogFileFromGitHub() {
+  if (!octokit) {
+    console.error('GitHub 토큰이 설정되지 않았습니다.');
+    return { content: [], sha: null };
+  }
+
   try {
     const response = await octokit.repos.getContent({
       owner: GITHUB_OWNER,
@@ -75,6 +80,7 @@ async function getLogFileFromGitHub() {
       console.log('로그 파일이 없습니다. 새로 생성합니다.');
       return { content: [], sha: null };
     }
+    console.error('GitHub 로그 파일 가져오기 오류:', error);
     throw error;
   }
 }
@@ -83,6 +89,11 @@ async function getLogFileFromGitHub() {
  * GitHub에 로그 파일 업데이트
  */
 async function updateLogFileOnGitHub(logData, sha) {
+  if (!octokit) {
+    console.error('GitHub 토큰이 설정되지 않았습니다.');
+    return null;
+  }
+
   try {
     const content = Buffer.from(JSON.stringify(logData, null, 2)).toString('base64');
     
@@ -191,14 +202,70 @@ function messageToLogEntry(message) {
 }
 
 /**
+ * 환경 변수 구성 확인
+ */
+function checkConfiguration() {
+  const missingVars = [];
+  
+  if (!DISCORD_TOKEN) missingVars.push('DISCORD_TOKEN');
+  if (!GITHUB_TOKEN) missingVars.push('GITHUB_TOKEN');
+  if (!GITHUB_OWNER) missingVars.push('GITHUB_OWNER');
+  if (!GITHUB_REPO) missingVars.push('GITHUB_REPO');
+  if (!MONITORED_CHANNEL_IDS || MONITORED_CHANNEL_IDS.length === 0) missingVars.push('MONITORED_CHANNEL_IDS');
+
+  return missingVars;
+}
+
+/**
  * API 핸들러: Cron 작업으로 실행됨
  */
 export default async function handler(req, res) {
-  // Vercel Cron 인증 확인
+  // Vercel Cron 인증 확인 또는 테스트 목적의 GET 요청 허용
   if (req.headers['x-vercel-signature'] || req.method === 'GET') {
     console.log('Discord 로그 동기화 시작...');
+
+    // 환경 변수 확인
+    const missingConfig = checkConfiguration();
+    if (missingConfig.length > 0) {
+      const errorMessage = `필수 환경 변수가 설정되지 않았습니다: ${missingConfig.join(', ')}`;
+      console.error(errorMessage);
+      
+      // GET 요청의 경우 설정 상태 반환
+      if (req.method === 'GET') {
+        return res.status(200).json({
+          success: false,
+          error: errorMessage,
+          config: {
+            hasDiscordToken: !!DISCORD_TOKEN,
+            hasGithubToken: !!GITHUB_TOKEN,
+            hasGithubOwner: !!GITHUB_OWNER,
+            hasGithubRepo: !!GITHUB_REPO,
+            monitoredChannels: MONITORED_CHANNEL_IDS,
+            hasWebhook: !!DISCORD_WEBHOOK_URL && !DISCORD_WEBHOOK_URL.includes('YOUR_WEBHOOK')
+          }
+        });
+      }
+      
+      return res.status(500).json({ success: false, error: errorMessage });
+    }
     
     try {
+      // GET 요청의 경우 직접 실행을 위한 테스트인지 확인
+      const isTestRun = req.method === 'GET' && req.query.test === 'true';
+      
+      if (isTestRun) {
+        return res.status(200).json({
+          success: true,
+          message: '설정 확인 완료. 모든 환경 변수가 올바르게 설정되었습니다.',
+          config: {
+            owner: GITHUB_OWNER,
+            repo: GITHUB_REPO, 
+            monitoredChannels: MONITORED_CHANNEL_IDS,
+            hasWebhook: !!DISCORD_WEBHOOK_URL
+          }
+        });
+      }
+      
       // 1. GitHub에서 현재 로그 가져오기
       const { content: logData, sha } = await getLogFileFromGitHub();
       
