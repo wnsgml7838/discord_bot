@@ -259,6 +259,21 @@ function createImageLogEntry(message) {
   };
 }
 
+/**
+ * 메시지가 이미 처리되었는지 중복 체크 (ID와 타임스탬프 모두 비교)
+ */
+function isDuplicateMessage(message, existingLogs) {
+  if (!existingLogs || existingLogs.length === 0) return false;
+  
+  const messageId = message.id;
+  const timestamp = message.timestamp;
+  
+  return existingLogs.some(log => 
+    (log.id === messageId || log.messageId === messageId) && 
+    (log.timestamp === timestamp)
+  );
+}
+
 export default async function handler(req, res) {
   // 결과 객체 초기화
   const result = {
@@ -378,8 +393,9 @@ export default async function handler(req, res) {
           
           // 1. 인증 로그용 정보 추출 및 저장
           const logInfo = extractAuthLogInfo(message);
-          const existingLogIndex = existingAuthLogs ? existingAuthLogs.findIndex(log => log.id === logInfo.id) : -1;
-          if (existingLogIndex === -1) {
+          
+          // 강화된 중복 체크: 메시지 ID와 타임스탬프 모두 비교
+          if (!isDuplicateMessage(message, existingAuthLogs)) {
             newAuthLogs.push(logInfo);
             result.logs.channels[channelId].new++;
             totalNewLogs++;
@@ -387,11 +403,8 @@ export default async function handler(req, res) {
           
           // 2. 이미지 로그용 정보 추출 및 저장 (이미지가 있는 메시지만)
           if (isAuthImageMessage(message)) {
-            // 이미 처리된 메시지인지 확인
-            const existingImageIndex = existingImageLogs ? 
-              existingImageLogs.findIndex(log => log.messageId === message.id) : -1;
-            
-            if (existingImageIndex === -1) {
+            // 강화된 중복 체크: 메시지 ID와 타임스탬프 모두 비교
+            if (!isDuplicateMessage(message, existingImageLogs)) {
               const imageLogEntry = createImageLogEntry(message);
               if (imageLogEntry.image_url) {
                 newImageLogs.push(imageLogEntry);
