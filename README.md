@@ -40,6 +40,18 @@ DISCORD_WEBHOOK_URL=your_discord_webhook_url
 
 이 프로젝트는 Vercel에 자동 배포됩니다. GitHub 저장소에 변경사항을 푸시하면 자동으로 배포 프로세스가 시작됩니다.
 
+### Vercel Hobby 플랜 제한 사항
+
+현재 이 프로젝트는 Vercel Hobby 플랜에 맞춰 최적화되었습니다:
+
+- **cron job 실행 제한**: Hobby 플랜에서는 계정당 최대 2개의 cron job이 **하루에 한 번**만 실행됩니다.
+- **cron job 실행 시간 불확실성**: 지정된 시간에서 최대 59분 내에 실행될 수 있습니다.
+- **현재 설정**:
+  - `/api/cron-logger`: 매일 정오(12:00)에 서버 상태 보고
+  - `/api/discord-log-sync-simple`: 매일 자정(00:00)에 로그 동기화
+
+더 자주 cron job을 실행하려면 Vercel Pro 플랜으로 업그레이드하세요.
+
 ### 배포 문제 해결
 
 Vercel 배포가 제대로 되지 않는 경우 다음 단계를 시도해보세요:
@@ -55,9 +67,10 @@ Vercel 배포가 제대로 되지 않는 경우 다음 단계를 시도해보세
 ### Discord Bot 관련
 
 - `/api/test-webhook` - Discord 웹훅 테스트
-- `/api/discord-log-sync-simple` - 간단한 로그 동기화
+- `/api/discord-log-sync-simple` - 일일 로그 동기화 (매일 자정)
 - `/api/discord-log-sync-debug` - 로그 동기화 디버깅
 - `/api/test-direct` - 간단한 상태 확인 API
+- `/api/simple-check` - 서버 상태 체크
 
 ### 문제 추천 관련
 
@@ -68,7 +81,7 @@ Vercel 배포가 제대로 되지 않는 경우 다음 단계를 시도해보세
 
 - `/api/log-activity` - 활동 로그 기록
 - `/api/logs` - 로그 조회
-- `/api/cron-logger` - 정기 로그 수집 (cron)
+- `/api/cron-logger` - 일일 서버 상태 보고 (매일 정오)
 
 ## 기술 스택
 
