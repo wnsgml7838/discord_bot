@@ -7,7 +7,7 @@ const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 const MONITORED_CHANNEL_IDS = process.env.MONITORED_CHANNEL_IDS ? 
   process.env.MONITORED_CHANNEL_IDS.split(',') : [];
 
-module.exports = async function(req, res) {
+export default async function handler(req, res) {
   try {
     // 현재 날짜 정보 추출
     const now = new Date();
