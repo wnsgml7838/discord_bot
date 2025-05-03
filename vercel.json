@@ -15,11 +15,11 @@
   "crons": [
     {
       "path": "/api/cron-logger",
-      "schedule": "0 */3 * * *"
+      "schedule": "0 12 * * *"
     },
     {
       "path": "/api/discord-log-sync-simple",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 } 
