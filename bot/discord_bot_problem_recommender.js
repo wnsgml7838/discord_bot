@@ -8,10 +8,17 @@ import fetch from 'node-fetch';
 // cheerio 로드
 let cheerio;
 try {
-  cheerio = require('cheerio');
+  // ES Module 방식으로 cheerio 가져오기 시도
+  import('cheerio').then(module => {
+    cheerio = module;
+  }).catch(error => {
+    console.warn('cheerio 모듈을 가져올 수 없습니다:', error);
+    // cheerio가 없어도 기본 동작은 가능하도록 빈 객체 제공
+    cheerio = { load: () => ({ find: () => ({ text: () => '' }) }) };
+  });
 } catch (error) {
-  console.warn('cheerio 모듈을 가져올 수 없습니다:', error);
-  // cheerio가 없어도 기본 동작은 가능하도록 빈 객체 제공
+  console.warn('cheerio 모듈을 동적으로 가져올 수 없습니다:', error);
+  // 오류 발생시 대체 객체 제공
   cheerio = { load: () => ({ find: () => ({ text: () => '' }) }) };
 }
 
@@ -839,4 +846,4 @@ function formatRecommendations(recommendedProblems, targetTier) {
   return html;
 }
 
-module.exports = { recommendBaekjoonProblems }; 
+export { recommendBaekjoonProblems }; 
