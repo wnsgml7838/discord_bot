@@ -1,5 +1,5 @@
 /**
- * 간단한 디스코드 로그 동기화 API
+ * 간단한 디스코드 로그 동기화 API (하루 한 번 실행)
  */
 
 // 환경 변수
@@ -9,7 +9,16 @@ const MONITORED_CHANNEL_IDS = process.env.MONITORED_CHANNEL_IDS ?
 
 module.exports = async function(req, res) {
   try {
-    // 웹훅을 통해 디버그 메시지 보내기
+    // 현재 날짜 정보 추출
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().split(' ')[0];
+    
+    // 요일 한글로 변환
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    const dayOfWeek = days[now.getDay()];
+    
+    // 웹훅을 통해 일일 보고서 메시지 보내기
     if (DISCORD_WEBHOOK_URL) {
       try {
         const response = await fetch(DISCORD_WEBHOOK_URL, {
@@ -17,8 +26,8 @@ module.exports = async function(req, res) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             embeds: [{
-              title: '📝 Simple 로그 동기화',
-              description: '간단한 로그 동기화 API가 호출되었습니다.\n\n현재 시간: ' + new Date().toISOString(),
+              title: '📅 일일 로그 동기화',
+              description: `${dateStr} (${dayOfWeek}) 일일 로그 동기화가 실행되었습니다.\n\n실행 시간: ${timeStr}`,
               color: 0x00ff00,
               fields: [
                 {
@@ -26,6 +35,14 @@ module.exports = async function(req, res) {
                   value: MONITORED_CHANNEL_IDS.length > 0 ? 
                     MONITORED_CHANNEL_IDS.join(', ') : 
                     '설정된 채널 없음'
+                },
+                {
+                  name: '동기화 주기',
+                  value: 'Hobby 플랜: 하루 한 번 실행 (매일 자정)'
+                },
+                {
+                  name: '주요 현황',
+                  value: '지난 24시간 동안의 활동을 수집합니다.'
                 }
               ],
               timestamp: new Date().toISOString()
@@ -36,7 +53,9 @@ module.exports = async function(req, res) {
         if (response.ok) {
           return res.status(200).json({
             success: true,
-            message: '웹훅 메시지가 성공적으로 전송되었습니다.',
+            message: '일일 로그 동기화 메시지가 성공적으로 전송되었습니다.',
+            date: dateStr,
+            time: timeStr,
             config: {
               monitoredChannels: MONITORED_CHANNEL_IDS,
               hasWebhook: true
@@ -50,6 +69,8 @@ module.exports = async function(req, res) {
         return res.status(500).json({
           success: false,
           error: `웹훅 전송 실패: ${error.message}`,
+          date: dateStr,
+          time: timeStr,
           config: {
             monitoredChannels: MONITORED_CHANNEL_IDS,
             hasWebhook: !!DISCORD_WEBHOOK_URL
@@ -60,6 +81,8 @@ module.exports = async function(req, res) {
       return res.status(400).json({
         success: false,
         error: 'Discord 웹훅 URL이 설정되지 않았습니다',
+        date: dateStr,
+        time: timeStr,
         config: {
           monitoredChannels: MONITORED_CHANNEL_IDS,
           hasWebhook: false
@@ -69,7 +92,8 @@ module.exports = async function(req, res) {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      error: `API 오류: ${error.message}`
+      error: `API 오류: ${error.message}`,
+      timestamp: new Date().toISOString()
     });
   }
 } 

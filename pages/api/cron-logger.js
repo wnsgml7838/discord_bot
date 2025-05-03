@@ -1,7 +1,7 @@
 /**
  * pages/api/cron-logger.js
- * Vercel 서버리스 함수로 주기적으로 실행되어 활동 로그를 처리합니다.
- * Vercel Cron Jobs을 통해 호출됩니다.
+ * Vercel 서버리스 함수로 일일 활동 로그를 처리합니다.
+ * Vercel Cron Jobs을 통해 하루에 한 번 호출됩니다. (Hobby 플랜 제한)
  */
 
 // 필요한 환경변수: DISCORD_WEBHOOK_URL
@@ -27,27 +27,36 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Discord Webhook URL is not configured' });
     }
 
+    // 현재 날짜 정보
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    const dayOfWeek = days[now.getDay()];
+
     // 현재 서버 상태 정보 수집
     const statusInfo = {
-      timestamp: new Date().toISOString(),
+      timestamp: now.toISOString(),
       environment: process.env.NODE_ENV || 'development',
       memory: process.memoryUsage(),
       uptime: process.uptime(),
     };
 
-    // Discord로 상태 메시지 전송
+    // Discord로 일일 상태 메시지 전송
     const message = {
       embeds: [{
-        title: '🤖 Vercel 앱 상태 보고',
+        title: '📊 일일 서버 상태 보고',
+        description: `${dateStr} (${dayOfWeek}) 일일 서버 상태 보고서입니다.`,
         color: 0x00FF00, // 녹색
         fields: [
+          { name: '날짜', value: dateStr, inline: true },
+          { name: '요일', value: dayOfWeek, inline: true },
           { name: '환경', value: statusInfo.environment, inline: true },
-          { name: '타임스탬프', value: statusInfo.timestamp, inline: true },
           { name: '서버 가동 시간', value: `${Math.floor(statusInfo.uptime / 60 / 60)} 시간`, inline: true },
           { name: '메모리 사용량', value: `${Math.round(statusInfo.memory.rss / 1024 / 1024)} MB`, inline: true },
+          { name: '실행 주기', value: 'Hobby 플랜: 하루에 한 번 (매일 정오)', inline: false },
         ],
-        footer: { text: 'Vercel 서버리스 크론 작업' },
-        timestamp: new Date().toISOString()
+        footer: { text: 'Vercel Hobby 플랜 일일 크론 작업' },
+        timestamp: now.toISOString()
       }]
     };
 
@@ -59,14 +68,29 @@ export default async function handler(req, res) {
     });
 
     if (response.ok) {
-      return res.status(200).json({ success: true, message: 'Status reported successfully' });
+      return res.status(200).json({ 
+        success: true, 
+        message: '일일 상태 보고가 성공적으로 전송되었습니다.',
+        date: dateStr,
+        day: dayOfWeek
+      });
     } else {
       const errorData = await response.text();
-      console.error('Failed to send Discord webhook:', errorData);
-      return res.status(500).json({ success: false, error: 'Failed to send Discord webhook', details: errorData });
+      console.error('Discord 웹훅 전송 실패:', errorData);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Discord 웹훅 전송 실패', 
+        details: errorData,
+        date: dateStr
+      });
     }
   } catch (error) {
-    console.error('Error in cron-logger:', error);
-    return res.status(500).json({ success: false, error: 'Internal Server Error', details: error.message });
+    console.error('cron-logger 오류:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: '내부 서버 오류', 
+      details: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 } 
