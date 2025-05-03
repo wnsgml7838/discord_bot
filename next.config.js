@@ -22,6 +22,7 @@ const nextConfig = {
     GITHUB_OWNER: process.env.GITHUB_OWNER,
     GITHUB_REPO: process.env.GITHUB_REPO,
   },
+  // CORS 헤더 설정
   async headers() {
     return [
       {

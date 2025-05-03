@@ -4,10 +4,6 @@
     {
       "src": "package.json",
       "use": "@vercel/next"
-    },
-    {
-      "src": "bot/discord_bot_problem_recommender.js",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
