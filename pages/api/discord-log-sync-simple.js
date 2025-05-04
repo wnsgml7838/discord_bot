@@ -10,7 +10,9 @@ const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 const MONITORED_CHANNEL_IDS = process.env.MONITORED_CHANNEL_IDS ? 
   process.env.MONITORED_CHANNEL_IDS.split(',') : [];
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GITHUB_REPO = process.env.GITHUB_REPO || 'wnsgml7838/discord_bot';
+const GITHUB_OWNER = process.env.GITHUB_OWNER || 'wnsgml7838';
+const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME || 'discord_bot';
+const GITHUB_REPO = `${GITHUB_OWNER}/${GITHUB_REPO_NAME}`;
 const LOG_FILE_PATH = 'data/auth_logs.json';
 const PUBLIC_LOG_FILE_PATH = 'public/image_log.json';
 
@@ -53,6 +55,8 @@ async function fetchExistingLogs(filePath) {
   if (!GITHUB_TOKEN) return { success: false, logs: [], error: 'GitHub 토큰이 설정되지 않았습니다' };
   
   try {
+    console.log(`GitHub에서 파일 가져오기 시도: ${filePath}, 저장소: ${GITHUB_REPO}`);
+    
     // 파일 내용 가져오기 (base64로 인코딩됨)
     const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`, {
       headers: {
@@ -62,13 +66,15 @@ async function fetchExistingLogs(filePath) {
     });
     
     if (response.status === 404) {
+      console.log(`GitHub에서 파일을 찾을 수 없음: ${filePath}. 빈 로그 배열로 시작합니다.`);
       // 파일이 없는 경우 빈 로그 배열 반환
       return { success: true, logs: [], sha: null };
     }
     
     if (!response.ok) {
-      const error = await response.text();
-      return { success: false, logs: [], error: `GitHub API 오류: ${response.status} ${error}` };
+      const errorText = await response.text();
+      console.error(`GitHub API 오류 (${response.status}): ${errorText}`);
+      return { success: false, logs: [], error: `GitHub API 오류: ${response.status} ${errorText}` };
     }
     
     const data = await response.json();
@@ -76,11 +82,14 @@ async function fetchExistingLogs(filePath) {
     
     try {
       const logs = content ? JSON.parse(content) : [];
+      console.log(`파일에서 ${logs.length}개의 로그 항목을 성공적으로 가져왔습니다.`);
       return { success: true, logs, sha: data.sha };
     } catch (error) {
+      console.error(`로그 JSON 파싱 오류: ${error.message}`);
       return { success: false, logs: [], error: `로그 파싱 오류: ${error.message}` };
     }
   } catch (error) {
+    console.error(`GitHub API 요청 중 예외 발생: ${error.message}`);
     return { success: false, logs: [], error: `GitHub API 요청 오류: ${error.message}` };
   }
 }
@@ -92,6 +101,8 @@ async function saveLogsToGitHub(logs, filePath, existingSha) {
   if (!GITHUB_TOKEN) return { success: false, error: 'GitHub 토큰이 설정되지 않았습니다' };
   
   try {
+    console.log(`GitHub에 파일 저장 시도: ${filePath}, 저장소: ${GITHUB_REPO}, SHA 존재: ${!!existingSha}`);
+    
     const content = Buffer.from(JSON.stringify(logs, null, 2)).toString('base64');
     
     const body = {
@@ -100,7 +111,11 @@ async function saveLogsToGitHub(logs, filePath, existingSha) {
       ...(existingSha ? { sha: existingSha } : {})
     };
     
-    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`, {
+    // 디버깅을 위한 API URL 출력
+    const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${filePath}`;
+    console.log(`GitHub API URL: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl, {
       method: 'PUT',
       headers: {
         'Authorization': `token ${GITHUB_TOKEN}`,
@@ -111,12 +126,26 @@ async function saveLogsToGitHub(logs, filePath, existingSha) {
     });
     
     if (!response.ok) {
-      const error = await response.text();
-      return { success: false, error: `GitHub 저장 실패: ${response.status} ${error}` };
+      const errorText = await response.text();
+      console.error(`GitHub 저장 실패 (${response.status}): ${errorText}`);
+      
+      // 디버깅용 추가 정보
+      if (response.status === 404) {
+        console.error('404 오류 발생: 저장소 또는 파일 경로를 확인하세요.');
+        console.error(`소유자: ${GITHUB_OWNER}, 저장소명: ${GITHUB_REPO_NAME}`);
+        console.error(`전체 저장소 경로: ${GITHUB_REPO}`);
+        console.error(`파일 경로: ${filePath}`);
+      } else if (response.status === 401) {
+        console.error('401 오류 발생: GitHub 토큰 권한을 확인하세요.');
+      }
+      
+      return { success: false, error: `GitHub 저장 실패: ${response.status} ${errorText}` };
     }
     
+    console.log(`파일을 성공적으로 GitHub에 저장했습니다: ${filePath}`);
     return { success: true };
   } catch (error) {
+    console.error(`GitHub 저장 중 예외 발생: ${error.message}`);
     return { success: false, error: `GitHub 저장 오류: ${error.message}` };
   }
 }
@@ -285,7 +314,12 @@ export default async function handler(req, res) {
       channels: {},
       imageLogsAdded: 0
     },
-    errors: []
+    errors: [],
+    debug: {
+      githubRepo: GITHUB_REPO,
+      authLogPath: LOG_FILE_PATH,
+      imageLogPath: PUBLIC_LOG_FILE_PATH
+    }
   };
   
   try {
@@ -315,6 +349,17 @@ export default async function handler(req, res) {
         [], 0, true
       );
       return res.status(400).json(result);
+    }
+    
+    if (!GITHUB_TOKEN) {
+      result.errors.push('GitHub 토큰이 설정되지 않았습니다. 로그는 수집되지만 저장되지 않을 것입니다.');
+      console.error('GitHub 토큰이 설정되지 않았습니다. 환경 변수 GITHUB_TOKEN을 확인하세요.');
+      await logToWebhook(
+        '⚠️ GitHub 연결 문제', 
+        `GitHub 토큰이 설정되지 않아 로그를 저장할 수 없습니다. 환경 변수를 확인하세요.`, 
+        [], 0, true
+      );
+      // 토큰이 없어도 계속 진행 (저장만 실패)
     }
     
     // 기존 로그 파일들 가져오기
@@ -489,6 +534,11 @@ export default async function handler(req, res) {
         name: '새로 추가된 이미지 로그',
         value: `${totalNewImageLogs}개`,
         inline: true
+      },
+      {
+        name: 'GitHub 저장소 정보',
+        value: `저장소: ${GITHUB_REPO}\n인증 로그 경로: ${LOG_FILE_PATH}\n이미지 로그 경로: ${PUBLIC_LOG_FILE_PATH}`,
+        inline: false
       }
     ];
     
