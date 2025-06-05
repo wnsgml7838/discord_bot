@@ -1,6 +1,54 @@
 [
   {
     "nickname": "seodongjae_53362",
+    "timestamp": "2025-06-04T15:18:41.668Z",
+    "timestampStr": "2025-06-04 15:18:41",
+    "kstTimestampStr": "2025-06-05 00:18:41",
+    "image_url": "https://cdn.discordapp.com/attachments/1351456704973508663/1379841801162326066/image.png?ex=6841b551&is=684063d1&hm=6909fda97d11dc57015dd12bdce6349efad70a584bd43bea9b203020835e855f&",
+    "messageId": "1379841801371914302"
+  },
+  {
+    "nickname": "dalpeng.",
+    "timestamp": "2025-06-04T14:41:22.250Z",
+    "timestampStr": "2025-06-04 14:41:22",
+    "kstTimestampStr": "2025-06-04 23:41:22",
+    "image_url": "https://cdn.discordapp.com/attachments/1351456704973508663/1379832408362451107/2025-06-04_154559.png?ex=6841ac92&is=68405b12&hm=1a5c1edce8a764ebb322386eefc9ba5e6085382bd368384a35c5eb4e2d9b9be0&",
+    "messageId": "1379832408571904141"
+  },
+  {
+    "nickname": "whitesongi",
+    "timestamp": "2025-06-04T13:32:29.215Z",
+    "timestampStr": "2025-06-04 13:32:29",
+    "kstTimestampStr": "2025-06-04 22:32:29",
+    "image_url": "https://cdn.discordapp.com/attachments/1351456704973508663/1379815073094307870/0001.jpg?ex=68419c6d&is=68404aed&hm=ffc0dcd5795ee40ec29184d96d1efad97b5bd30f3999cf12b4bc67e917cf020e&",
+    "messageId": "1379815073366933555"
+  },
+  {
+    "nickname": "evanmccoy",
+    "timestamp": "2025-06-04T09:57:32.783Z",
+    "timestampStr": "2025-06-04 09:57:32",
+    "kstTimestampStr": "2025-06-04 18:57:32",
+    "image_url": "https://cdn.discordapp.com/attachments/1351456704973508663/1379760981629993001/image.png?ex=684212cc&is=6840c14c&hm=e4a916b7e981c00793032d2dbc4d856c7ed593f5231e57ab44f62a481603518a&",
+    "messageId": "1379760981810352199"
+  },
+  {
+    "nickname": "jjojil",
+    "timestamp": "2025-06-04T09:21:52.314Z",
+    "timestampStr": "2025-06-04 09:21:52",
+    "kstTimestampStr": "2025-06-04 18:21:52",
+    "image_url": "https://cdn.discordapp.com/attachments/1351456704973508663/1379752003701313597/2025-06-04_18.22.03.png?ex=68420a70&is=6840b8f0&hm=3d51387e95ef11d0d02e976f77918fab9030adff6bac9453792e55abbd6dde1b&",
+    "messageId": "1379752004032790598"
+  },
+  {
+    "nickname": "solsol5853",
+    "timestamp": "2025-06-04T06:44:00.825Z",
+    "timestampStr": "2025-06-04 06:44:00",
+    "kstTimestampStr": "2025-06-04 15:44:00",
+    "image_url": "https://cdn.discordapp.com/attachments/1351456704973508663/1379712277430931459/image.png?ex=6841e570&is=684093f0&hm=2e707bc7789655cb3707e2fa00f84238cd2b6f6d63530d748726b1d47354304b&",
+    "messageId": "1379712277728722944"
+  },
+  {
+    "nickname": "seodongjae_53362",
     "timestamp": "2025-06-03T14:45:14.076Z",
     "timestampStr": "2025-06-03 14:45:14",
     "kstTimestampStr": "2025-06-03 23:45:14",
